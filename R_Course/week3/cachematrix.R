@@ -35,7 +35,9 @@ makeCacheMatrix <- function(m = matrix()) {
 
 
 ## Write a short comment describing this function
-#Given a makeCacheMatrix object, 
+#Given a makeCacheMatrix object, it gets the inverse of the matrix. If it is
+#the first time, the function caches the inverse. If it is the second or later times
+#the function returns the cached inverse.
 cacheSolve <- function(x, ...) {
   ## Return a matrix that is the inverse of 'x'
   inversa <- x$getinverse()
