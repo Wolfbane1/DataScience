@@ -62,6 +62,25 @@ rm(origenData)
 rm(origenMat)
 rm(ficheroTomanA10Destino)
 rm(ficheroNoTomanA10Destino)
+
+rm(cuentaMedicamentos)
+
+#Sacar datos del 2011
+estadisticos(2011,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+
+#Sacar datos del 2012
+estadisticos(2012,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+
+d <- csv
+
+estadisticosId(d$Id)
+estadisticosSexo(d$Sexo)
+estadisticosEdad(d)
+estadisticosNivelCRG(d$nivel)
+revisaDispensacionATCsDiabeticos(d, ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+ejecutaComparativa(d)
+ejecutaRangoEdad(d)
+
 rm(estadisticosATCsVacios)
 rm(estadisticosEdad)
 rm(estadisticosId)
@@ -70,14 +89,46 @@ rm(estadisticosPosATCsVacios)
 rm(estadisticosSexo)
 rm(procesaCSV)
 
-#Comparativas entre variables. 
-ejecutaComparativa(csv)
-csv <- ejecutaRangoEdad(csv)
 
 rm(obtieneRangoEdad)
 rm(ejecutaComparativa)
 rm(ejecutaRangoEdad)
 rm(ejecutaComparativaRangoEdad)
+rm(estadisticos)
+rm(revisaDispensacionATCsDiabeticos)
+
+
+for (anyo in unique(csv$Anyo)) {
+  cat(paste("##", anyo, sep = ""))
+  
+  d <- csv[csv$Anyo == anyo,]
+
+  #Estadisticos básicos
+  cat("###Edad")
+  estadisticosEdad(d)
+}
+
+
+p <- qplot(d$Edad, ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad")
+ggplotly(p)
+
+qplot(table(d$Edad, d$Genero), colours=c("red", "blue"))
+boxplot(d$Edad)
+
+summary(d$Edad)
+
+  cat("###Sexo")
+  estadisticosSexo(d$Sexo)
+  
+  cat("###Id")
+  estadisticosId(d$Id)
+  
+  cat("###Nivel CRG-base")
+  estadisticosNivelCRG(d$nivel)
+  
+  #estadisticos(anyo,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+  rm(d)
+}
 
 #TODO en esta parte:
 #  --> relación de existencia / probabilidad de ocurrencia.
@@ -85,7 +136,359 @@ rm(ejecutaComparativaRangoEdad)
 #  --> búsqueda de DBSCAN para R. 
 #  --> cálculo del PCA. Cuando se tengan los PCAs, seguramente haya que evaluar rango de edad otra vez.
 #  --> análisis de correspondencia. 
+#  --> revisar si hay significancia estadística en la diferencia de grupos hombres y mujeres.
 
+#ALTERN -1 ) Para cada CRG-base, obtener el número de ocurrencias de cada familia de ATC por 
+#individuo durante 1 año y sumar el número de ocurrencias de familias de ATC para los individuos 
+#asociados al mismo CRG. Transformar el resultado de la suma en una medida de probabilidad 
+#(normalizar de modo que la suma de todos sea 1).
+
+######################################################################
+#### EJECUCION SOLO PARA HACER PCAs
+## Código PCAs. 
+####
+######################################################################
+
+#Tenemos que limpar las columnas que son ceros para 2011 y para 2012. 
+source("PCAs.R")
+source("clusterizacion.R")
+
+d11 <- eliminaATCsVacios(csv, 2011, 7:(ncol(csv)-N))
+d12 <- eliminaATCsVacios(csv, 2012, 7:(ncol(csv)-N))
+
+calculaPCA_nivel(d11, 7:(ncol(csv)-N))
+
+rm(calculaPCA_nivel)
+rm(cuentaFamilias)
+rm(eliminaATCsVacios)
+rm(obtieneExistencia)
+rm(reduceMatrizATC)
+rm(standMatrix)
+rm(standVector)
+
+################################
+########## Calcula Matrices
+######Reducción de dimensiones 
+
+
+d <- d11
+
+#2012
+ATC.nivel2 <- unique(substr(colnames(d12)[7:(ncol(d12)-N)], 1, 3))
+m <- matrix(nrow=nrow(d12), ncol=length(ATC.nivel2))
+d <- d12
+
+
+
+
+
+#m.scaled <- scale(m, center=TRUE, scale=TRUE)
+
+###### PCAs sobre el total. 
+
+
+
+#Restamos 4 porque son las columnas que se han añadido hasta este punto por detrás de los ATCs.
+m11 <- as.matrix(d11[, 7:(length(colnames(d11)) - 4)])
+m12 <- as.matrix(d11[, 7:(length(colnames(d12)) - 4)])
+
+
+m11.scaled <- standMatrix(m11)
+m12.scaled <- standMatrix(m12)
+
+pca11 <- calculaPCA(m11.scaled, m11)
+pca12 <- calculaPCA(m12)
+
+################################
+########## Ejecución de Matrices
+######Reducción de dimensiones 
+
+matriz <- m
+
+# Paso 1: Ejecución de los principales componentes.
+pca <- prcomp(matriz, center=TRUE, scale=TRUE)
+
+#Código para comprobar que los componentes principales provienen del SVD. 
+#svd1 <- svd(scale(m))
+#par(mfrow = c(1, 1))
+#plot(pca$rotation[, 1], svd1$v[, 1], pch = 19, xlab = "Principal Component 1", ylab = "Right Singular Vector 1")
+#abline(c(0, 1))
+
+# Paso 2: Revisión de la agrupación de los PC
+round(unclass(pca$rotation)[, 1:6], 2)
+
+rotacion <- unclass(pca$rotation)
+
+
+n <- 20 #número de PCs
+m <- 20 #número de ATCs que queremos analizar. 
+resultado <- as.data.frame(matrix(nrow=0, ncol=3))
+df <- as.data.frame(matrix(nrow=m, ncol=3))
+colnames(df) <- c("PC", "ATC", "EXPLICACION")
+colnames(resultado) <- c("PC", "ATC", "EXPLICACION")
+
+#Vamos a hacer una iteración para quedarnos con el TOP 50 de los ATCs.
+for ( i in 1:ncol(rotacion) ) {
+  #Calculamos el % de lo que aporta cada ATC al PCA. 
+  pca.por <- round(rotacion[, i] / sum(abs(rotacion[, i])),4)
+  
+  #Ordenamos de mayor aportación a menor.
+  pca.por.ord <- head(sort(pca.por, decreasing = TRUE), m)
+  pca.por.name <- names(pca.por.ord)[1:m]
+  pca.por.ord <- as.numeric(pca.por.ord)
+  
+  #Añadimos las filas
+  #df[, 1] <- rep(colnames(rotacion)[i], length(pca.por.name))
+  df[, 1] <- rep(i, length(pca.por.name))
+  df[, 2] <- pca.por.name
+  df[, 3] <- pca.por.ord
+  resultado <- rbind(resultado, df)
+}
+
+sum(resultado[resultado$PC %in% paste("PC",1:n,sep=""), 3])
+  
+unique(resultado[resultado$PC %in% 1:n, 2])
+
+  resultado <- rbind(resultado, m)
+
+  #grado de explicación de PC vs ATC
+  #r <- resultado[resultado$PC %in% paste("PC",1:n,sep=""), ]
+  r <- resultado[resultado$PC %in% 1:n, ]
+  r[,1] <- factor(r[,1])
+  r[,2] <- factor(r[,2])
+  qplot(r$PC, r$ATC, colour=r$PC, geom=c("point"), size=r$EXPLICACION)
+  qplot(r$ATC, r$PC, colour=r$PC, geom=c("point"), size=r$EXPLICACION) + 
+    theme(axis.text.x = element_text(size = 8, colour = "red", angle = 45))
+  
+  rr <- r[r$EXPLICACION > 0.03,]
+  qplot(rr$ATC, rr$PC, colour=rr$PC, geom=c("point"), size=rr$EXPLICACION) + 
+    theme(axis.text.x = element_text(size = 8, colour = "red", angle = 45))
+  
+  qplot(r[r$PC==1, "ATC"], r[r$PC==1, "EXPLICACION"], size=r[r$PC==1, "EXPLICACION"])
+  qplot(r[r$PC==2, "ATC"], r[r$PC==2, "EXPLICACION"], size=r[r$PC==2, "EXPLICACION"])
+  qplot(r[r$PC==3, "ATC"], r[r$PC==3, "EXPLICACION"], size=r[r$PC==3, "EXPLICACION"])
+  qplot(r[r$PC==4, "ATC"], r[r$PC==4, "EXPLICACION"], size=r[r$PC==4, "EXPLICACION"])
+  qplot(r[r$PC==5, "ATC"], r[r$PC==5, "EXPLICACION"], size=r[r$PC==5, "EXPLICACION"])
+  qplot(r[r$PC==6, "ATC"], r[r$PC==6, "EXPLICACION"], size=r[r$PC==6, "EXPLICACION"])
+  qplot(r[r$PC==7, "ATC"], r[r$PC==7, "EXPLICACION"], size=r[r$PC==7, "EXPLICACION"])
+  qplot(r[r$PC==8, "ATC"], r[r$PC==8, "EXPLICACION"], size=r[r$PC==8, "EXPLICACION"])
+  qplot(r[r$PC==9, "ATC"], r[r$PC==9, "EXPLICACION"], size=r[r$PC==9, "EXPLICACION"])
+  qplot(r[r$PC==10, "ATC"], r[r$PC==10, "EXPLICACION"], size=r[r$PC==10, "EXPLICACION"])
+  qplot(r[r$PC==11, "ATC"], r[r$PC==11, "EXPLICACION"], size=r[r$PC==11, "EXPLICACION"])
+  qplot(r[r$PC==12, "ATC"], r[r$PC==12, "EXPLICACION"], size=r[r$PC==12, "EXPLICACION"])
+  qplot(r[r$PC==13, "ATC"], r[r$PC==13, "EXPLICACION"], size=r[r$PC==13, "EXPLICACION"])
+  
+pca.por <- round(rotacion[, 2] / sum(abs(rotacion[, 2])),4)
+
+
+dff <- sqldf("SELECT PC, ATC, sum(EXPLICACION) from resultado group by PC, ATC")
+dff[,1] <- factor(dff[, 1])
+qplot(dff$PC, dff$`sum(EXPLICACION)`, geom=c("bar"), fill=dff$ATC, stat="identity")
+
+#dfff<- dff[dff$PC %in% paste("PC",1:n,sep=""),]
+dfff<- dff[dff$PC %in% 1:n,]
+dfff[,1] <- factor(dfff[, 1])
+
+qplot(dfff$PC, dfff$`sum(EXPLICACION)`, geom=c("bar"), fill=dfff$ATC, stat="identity")
+
+# Paso 3: Revisión de las varianzas de los PC.
+# a) Eigenvalues
+eig <- (pca$sdev)^2
+
+# b) Varianza en %
+variance <- eig*100/sum(eig)
+
+# c) Varianza acumulativa.
+cumvar <- cumsum(variance)
+
+eig.active <- data.frame(eig = eig, variance = variance,
+                         cumvariance = cumvar)
+head(eig.active, 200)
+
+summary(pca)
+
+# d) Visualizamos gráficamente
+#   % de Varianza.
+barplot(eig.active[, 3], names.arg=1:nrow(eig.active), 
+        main = "Varianzas",
+        xlab = "Componentes Principales",
+        ylab = "Porcentaje de Varianza",
+        col ="steelblue")
+# Add connected line segments to the plot
+abline(h=80,lty=6)
+
+#
+barplot(eig.active[, 2], names.arg=1:nrow(eig.active), 
+        main = "Varianzas",
+        xlab = "Componentes Principales",
+        ylab = "Porcentaje de Varianza",
+        col ="steelblue")
+# Add connected line segments to the plot
+lines(x = 1:nrow(eig.active), 
+      eig.active[, 2], 
+      type="b", pch=10, col = "red")
+
+#   Eugenvalue.
+barplot(eig.active[, 1], names.arg=1:nrow(eig.active), 
+        main = "Varianzas",
+        xlab = "Componentes Principales",
+        ylab = "Eigenvalues",
+        col ="steelblue")
+# Add connected line segments to the plot
+lines(x = 1:nrow(eig.active), 
+      eig.active[, 1], 
+      type="b", pch=10, col = "red")
+abline(h=1,lty=6)
+
+
+#PCA
+
+
+
+
+
+
+#Proyecto
+
+#Obtenemos la matriz de los ATCs.
+m <- as.matrix(csv[,7:400])
+m11 <- as.matrix(csv[csv$Anyo==2011,7:400])
+m12 <- as.matrix(csv[csv$Anyo==2012,7:400])
+
+#colnames(m) <- colnames(csv)[7:400]
+#image(1:394, 1:9392, t(m)[, nrow(m):1])
+ 
+#Tenemos que calcular la formula: X=UDV
+# -> scale --> A cada elemento de una matriz, le resta la media y la divide por su varianza. Es decir, la normaliza.
+# -> svd es una función que desglosa una matriz en sus valores singulares.
+#   -> U: Vectores singulares Izquierdos. Matriz ortogonal.
+#   -> V: Vectores singulares Derechos. Matriz ortogonal.
+#   -> D: Matriz diagonal de valores singulares.
+#
+# PCA es una amplicación de SVD. Los PCAs son los vectores singulares derechos(V). Se necesita
+# normalizar la matriz, que se hace con la función scale.
+svd1 <- svd(scale(m))
+
+par(mfrow = c(1, 3))
+image(t(m)[, nrow(m):1], main = "Original Data")
+plot(svd1$u[, 1], 9392:1, , ylab = "Row", xlab = "First left singular vector",
+       +     pch = 19)
+plot(svd1$v[, 1], xlab = "Column", ylab = "First right singular vector", pch = 19)
+
+par(mfrow = c(1, 2))
+plot(svd1$d, xlab = "Column", ylab = "Singular value", pch = 19)
+plot(svd1$d^2/sum(svd1$d^2), xlab = "Column", ylab = "Prop. of variance explained",
+           pch = 19)
+
+#PCAs 
+
+# Paso 1: Ejecución de los principales componentes.
+pca <- prcomp(m, scale = TRUE)
+pca11 <- prcomp(m11, scale = TRUE)
+
+par(mfrow = c(1, 1))
+plot(pca$rotation[, 1], svd1$v[, 1], pch = 19, xlab = "Principal Component 1", ylab = "Right Singular Vector 1")
+abline(c(0, 1))
+
+# Paso 2: Revisión de la agrupación de los PC
+round(unclass(pca$rotation)[, 1:6], 2)
+
+# Paso 3: Revisión de las varianzas de los PC.
+# a) Eigenvalues
+eig <- (pca$sdev)^2
+
+# b) Varianza en %
+variance <- eig*100/sum(eig)
+
+# c) Varianza acumulativa.
+cumvar <- cumsum(variance)
+
+eig.active <- data.frame(eig = eig, variance = variance,
+                                    cumvariance = cumvar)
+head(eig.active)
+
+summary(pca)
+
+# d) Visualizamos gráficamente
+#   % de Varianza.
+barplot(eig.active[, 2], names.arg=1:nrow(eig.active), 
+        main = "Varianzas",
+        xlab = "Componentes Principales",
+        ylab = "Porcentaje de Varianza",
+        col ="steelblue")
+# Add connected line segments to the plot
+lines(x = 1:nrow(eig.active), 
+      eig.active[, 2], 
+      type="b", pch=10, col = "red")
+
+#   Eugenvalue.
+barplot(eig.active[, 1], names.arg=1:nrow(eig.active), 
+        main = "Varianzas",
+        xlab = "Componentes Principales",
+        ylab = "Eigenvalues",
+        col ="steelblue")
+# Add connected line segments to the plot
+lines(x = 1:nrow(eig.active), 
+      eig.active[, 1], 
+      type="b", pch=10, col = "red")
+abline(h=1,lty=6)
+
+#An eigenvalue > 1 indicates that PCs account for more variance than accounted by one of the 
+# original variables in standardized data. This is commonly used as a cutoff point for which 
+# PCs are retained.
+#You can also limit the number of component to that number that accounts for a certain fraction 
+# of the total variance. For example, if you are satisfied with 80% of the total variance 
+# explained then use the number of components to achieve that.
+
+
+
+
+
+
+
+
+
+
+
+
+
+#Método 2
+
+# Paso 1 -> Preparar los datos (escalando y centrando)
+m.scaled <- scale(m, center = TRUE, scale = TRUE)
+
+# Paso 2 -> Calcular la matriz de correspondencias
+m.cor <- round(cor(m.scaled), 4)
+
+# Paso 3 -> Calcular los vectores y valores eigen de la matriz de correlación.
+#  -> Valores Eigen: Números de la diagonal de la matriz de covarianza diagonalizada.
+#  -> Vectores Eigen: Dirección de los nuevos ejes rotados.
+# 
+m.cor.eig <- eigen(m.cor)
+round(m.cor.eig$values,2)
+
+# Paso 4 -> Calcular el número de vectores de Eigen. Supongamos 12.
+round(m.cor.eig$values[1:12],2)
+
+# Paso 5 -> Ejecutar el nuevo juego de datos.
+#  Transponer los vectores
+eigenvectors.t <- t(m.cor.eig$vectors)
+
+#  Transponer el dato ajustado
+m.scaled.t <- t(m.scaled)
+
+#  Cálculo del nuevo dataset.
+m.new <- eigenvectors.t %*% m.scaled.t
+
+# Transpose new data ad rename columns
+m.new <- t(m.new)
+colnames(m.new) <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9", "PC10")
+
+
+#Ejemplo
+set.seed(12345)
+dataMatrix <- matrix(rnorm(400), nrow = 40)
+image(1:10, 1:40, t(dataMatrix)[, nrow(dataMatrix):1])
 
 
 
@@ -93,10 +496,45 @@ rm(ejecutaComparativaRangoEdad)
 # --> Incorporar 2012. Hay que sumar 1 a la Edad de los pacientes que están en 2011.
 # --> Analizar evolución de 2011 a 2012. Hay que ver los que cambian de CRG y habría que ver 
 #      evolución de medicamentos. 
-# --> 
+# --> Intersección de pacientes.
+
+#Vemos los pacientes que están en 2011 y en 2012.
+Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+Si_2011_Si_2012 <- cbind(Si_2011_Si_2012, rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)))
+colnames(Si_2011_Si_2012) <- c("Id", "Genero_11", "Edad_11", "CRG_11", "Id_12", "Genero_12", "Edad_12", "CRG_12")
+
+for (i in 1:nrow(Si_2011_Si_2012) ) {
+  Si_2011_Si_2012[i, c("Id_12", "Genero_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Genero", "Edad", "CRG")]
+  
+  #print(paste("I = ", i, " D12 = ", d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Genero", "Edad", "CRG")], "\n"))
+}
+rm(i)
+
+#Generamos el par old-new de los CRG.
+oldnew_distintos <- Si_2011_Si_2012[Si_2011_Si_2012$CRG_11 != Si_2011_Si_2012$CRG_12, c("CRG_11", "CRG_12")]
+oldnew_distintos[,"CRG_11"] <- as.character(oldnew_distintos[,"CRG_11"])
+oldnew_distintos[,"CRG_12"] <- as.character(oldnew_distintos[,"CRG_12"])
+l <- melt(table(oldnew_distintos))
+l[,"CRG_12"] <- as.factor(l[,"CRG_12"])
 
 
+unico <- unique(oldnew_distintos[,"CRG_11"])
+for (i in 1:length(unico)) {
+  p <- ggplot(l[l$CRG_11==unico[i],], aes(x=CRG_12, y=value, label=value)) +
+    geom_bar(stat="identity", fill=I("blue")) +
+    geom_text(size=4, color="red", hjust=0, vjust=-1) +
+    labs(x="Nuevo CRG-base", y="Número de pacientes", 
+         title=paste("Pacientes que han evolucionado desde el CRG-base", unico[i]))
+#  dev.print(file=paste(unico[i],".png",sep=""), device=png, width=800)
+#  dev.off()
+#  ggsave(paste(unico[i],".png",sep=""), device = png, limitsize=FALSE)
+  png(paste(unico[i],".png",sep=""))
+  print(p)
+  dev.off()
+}
 
+rm(Si_2011_Si_2012)
+rm(oldnew_distintos)
 
 ######################################################################
 ## Análisis de Correspondencia - Nivel de CRG y Género

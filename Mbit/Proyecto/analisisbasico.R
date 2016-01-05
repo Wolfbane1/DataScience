@@ -3,6 +3,36 @@ library("ggplot2")  #Librería de gráficos "mínimos".
 library("lattice")  #Librería de gráficos para la comparativa de variables.
 library("sqldf")    #Librería para tratar con SQL los objetos DataFrame.
 library("R.matlab") #Librería para escribir los .mat
+library("reshape2")
+
+N <- 8
+
+####################################
+## Función: estadisticos 
+#       --> Punto de entrada para ver los datos de un año concreto. 
+#
+estadisticos <-function(anyo, ficheroTomanA10Destino, ficheroNoTomanA10Destino) {
+  d <- csv[csv$Anyo == anyo,]
+  
+  #Estadisticos básicos
+  cat("###Edad")
+  estadisticosEdad(d$Edad)
+  
+  cat("###Sexo")
+  estadisticosSexo(d$Sexo)
+  
+  cat("###Id")
+  estadisticosId(d$Id)
+  
+  cat("###Nivel CRG-base")
+  estadisticosNivelCRG(d$nivel)
+  
+  #Estadisticos "básicos" complejos
+  #ejecutaRangoEdad(d)
+  #ejecutaComparativa(d)
+  #revisaDispensacionATCsDiabeticos(d,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+}
+
 
 ####################################
 ## Función: revisaDispensacionATCsDiabeticos 
@@ -34,7 +64,9 @@ revisaDispensacionATCsDiabeticos <- function(csv, ficheroTomanA10, ficheroNoToma
   #Una vez que hemos visto las gráficas, vamos a escribir los ficheros
   tomanA10 <- subset(csv, csv$totalATCDiabeticos > 0, select = c("Id", "totalATCDiabeticos", "totalATCOtros"))
   noTomanA10 <- subset(csv, csv$totalATCDiabeticos == 0, select = c("Id", "totalATCDiabeticos", "totalATCOtros")) 
-  
+
+  print(paste("Toman A10:", nrow(tomanA10), " (", round(nrow(tomanA10)*100/nrow(csv),2), "%) - No toman A10:", nrow(noTomanA10), " (", round(nrow(noTomanA10)*100/nrow(csv)), "%)", sep=""))
+        
   writeMat(ficheroTomanA10, x=tomanA10)
   writeMat(ficheroNoTomanA10, x=noTomanA10)
 }
@@ -50,26 +82,7 @@ revisaDispensacionATCsDiabeticos <- function(csv, ficheroTomanA10, ficheroNoToma
 # -> Nivel               --> Categórica. ¿Ordenada?
 # -> Número de pacientes --> Contínua.
 ejecutaComparativa <- function(csv2) {
-  ######################
-  ## Edad vs Género
-  ######################
-  
-  ##
-  # Histograma
-  ##
-  
-  #Distribución por Edad y Género
-  qplot(csv2$Edad, geom="histogram", fill = csv2$Genero,
-        xlab="Edad", ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad y Género")
-  
-  ##
-  # Boxplot
-  ##
-  
-  #Distribución por Edad y Género
-  qplot(csv2$Genero, csv2$Edad, geom="boxplot", fill = csv2$Genero,
-        xlab="Género", ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad y Género")
-  
+
   ######################
   ## Género vs Nivel
   ######################
@@ -77,18 +90,20 @@ ejecutaComparativa <- function(csv2) {
   ##
   # Histograma
   ##
-  
-  qplot(csv2$nivel, geom="histogram", fill = csv2$Genero,
-        xlab="Nivel", ylab = "Número Pacientes", main = "Distribución de Pacientes por Nivel y Género")
+  cat("**Gráfica Comparativa.1** -> Número de Pacientes por CRG-base y Género (Histograma)")
+  print(
+    qplot(csv2$nivel, geom="histogram", fill = csv2$Genero,
+        xlab="CRG-base", ylab = "Número Pacientes", main = "Distribución de Pacientes por CRG-base y Género"))
   
   ##
-  # Boxplot
+  # Puntos
   ##
-  
   df <- sqldf("select Genero, nivel, count(*) as num from csv2 group by Genero, nivel")
   
-  qplot(df$nivel, df$Genero, geom="point", colour = df$Genero, size=df$num,
-        xlab="Nivel", ylab = "Número Pacientes", main = "Distribución de Pacientes por Nivel y Género")
+  cat("\n\n**Gráfica Comparativa.2** -> Número de Pacientes por CRG-base y Género (Burbujas)")
+  print(
+    qplot(df$Genero, df$nivel, geom="point", colour = df$Genero, size=df$num,
+        ylab="CRG-base", xlab = "Género", main = "Distribución de Pacientes por CRG-base y Género"))
   
   rm(df)
   
@@ -99,8 +114,10 @@ ejecutaComparativa <- function(csv2) {
   ##
   # Histograma
   ##
-  qplot(csv2$Edad, geom="histogram", fill = csv2$nivel,
-        xlab="Edad", ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad y Nivel CRG")
+  cat("\n\n**Gráfica Comparativa.3** -> Número de Pacientes por Edad y CRG-base (Histograma)")
+  print(
+    qplot(csv2$Edad, geom="histogram", fill = csv2$nivel,
+        xlab="Edad", ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad y CRG-base"))
   
   ##
   # Boxplot
@@ -299,7 +316,7 @@ ejecutaComparativaRangoEdad <- function(csv, tipo) {
 } 
 
 ####################################
-## Función: procesaCSV --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
+## Función: obtieneRangoEdad --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
 #                          lee el fichero y genera las columnas necesarias.
 #Tipos de distribución
 # -> 1: Distribución lineal en base a percentiles.
@@ -346,9 +363,11 @@ obtieneRangoEdad <- function(tipo, csv) {
 procesaCSV <- function(ficheroDestino) {
   #Códigos ATC para diabéticos.
   ATCsDiabeticos <- c("A10AB","A10AC","A10AD","A10AE","A10AF","A10BA","A10BB","A10BC","A10BD","A10BF","A10BG","A10BH","A10BX","A10XA")
+  cat(paste("Medicamentos que se consideran como ATCs para Diabéticos:"), imprime(ATCsDiabeticos), "\n\n", sep="")
   
   #Lee el fichero de entrada.
-  csv <- read.csv( ficheroDestino )
+  #csv <- read.csv( ficheroDestino, nrows=100 )
+  csv <- read.csv( ficheroDestino)
   
   #PUNTO 1: Se añaden variables "factor".
   #Variables categóricas: Se generan las variables categóricas a partir de los daots del fichero:
@@ -367,14 +386,27 @@ procesaCSV <- function(ficheroDestino) {
   
   csv <- cbind(csv, apply(csv[, colnames(csv) %in% setdiff(colnames(csv)[7:752], ATCsDiabeticos)], 1, sum))
   colnames(csv)[756] <- "totalATCOtros"
+
+  csv <- cbind(csv, apply(csv[, colnames(csv)[7:752]], 1, sum))
+  colnames(csv)[757] <- "totalATCTodos"
   
-  #PUNTO 3: Se eliminan variables
+  #PUNTO 3: Se añaden tres variables nuevas contando el número de medicamentos (separando diabetes de no) y una total sin separla.
+  csv <- cbind(csv, apply(csv[,colnames(csv) %in% ATCsDiabeticos], 1, cuentaMedicamentos))
+  colnames(csv)[758] <- "numATCDiabeticos"
+  
+  csv <- cbind(csv, apply(csv[, colnames(csv) %in% setdiff(colnames(csv)[7:752], ATCsDiabeticos)], 1, cuentaMedicamentos))
+  colnames(csv)[759] <- "numATCOtros"
+  
+  csv <- cbind(csv, apply(csv[, colnames(csv)[7:752]], 1, cuentaMedicamentos))
+  colnames(csv)[760] <- "numATCTodos"
+  
+  #PUNTO 4: Se eliminan variables
   #Variables ATC que no tienen ninguna dispensación. Se eliminan para hacer una primera reducción.
   atcsVacios <- estadisticosPosATCsVacios(csv)
   av <- estadisticosATCsVacios(csv)
   #además, se saca un warning con el listado que no tienen dispensación
-  warning(paste("Warning:", length(av), " familias que no tienen dispensación:"))
-  warning(paste(av, "\n"))
+  #warning(paste("Warning:", length(av), " familias que no tienen dispensación:"))
+  #warning(paste(av, "\n"))
   
   csv <- csv[,-c(atcsVacios)]
   
@@ -396,30 +428,31 @@ estadisticosId <- function(Id) {
   # -> No tiene sentido analizar la información proporcionada por summary. 
   # -> No tiene elementos duplicados.
   # -> No tiene valores NAs.
-  summary(Id)
-  length(Id) == length(unique(Id))
-  is.na(Id) == TRUE
+  cat("\n\nResumen de ID: ")
+  print(summary(Id))
   
-  print("ID --> Duplicados:NO;Nulos:NO")
+  cat("\n\nIDs duplicados: ")
+  print(!(length(Id) == length(unique(Id))))
 }
 
 ####################################
-## Función: estadisticosId --> Pretendemos hacer un análisis estadístico sencillo y básico sobre
+## Función: estadisticosSexo --> Pretendemos hacer un análisis estadístico sencillo y básico sobre
 #                              la distribución de los datos. 
 #
 #
-estadisticosSexo <- function(Sexo) {
+estadisticosSexo <- function(Genero) {
   ##Sexo
   # Categórica: Dos Valores
   #   1 --> 4.278 (45,54%) 
   #   2 --> 5.114 (54,45%)
-  Sexo <- csv$Sexo
-  summary(Sexo)
-  table(Sexo)
-  table(Sexo)/length(Sexo)
-  plot(table(Sexo), type="h", col = c("red", "blue"), lwd = 100)
-
-  print("Sexo --> 1 (4.278 - 45,54%);2 (5.114 - 54,45%)")
+  cat("\n\n% de Pacientes por género")
+  print(table(Genero)/length(Genero))
+  
+  cat("\n\nNúmero de Pacientes por género")
+  print(melt(table(Genero)))
+  
+  cat("\n\n**Gráfica Género.1** -> Número de Pacientes por género")
+  print(qplot(Genero, type="h", fill = Genero, ylab="Número de pacientes"))
 }
 
 ## Edad
@@ -430,116 +463,114 @@ estadisticosSexo <- function(Sexo) {
 # --> Mínimo: Edad de 0 registros. ¿Puede nacer un niño ya diabético?
 # --> Máximo: Edad de 98 regitros.
 # --> No tiene valores medio.
-estadisticosEdad <- function(Edad) {
-  Edad <- csv$Edad
-  summary(Edad)
-  is.na(Edad)
-  table(Edad)
-  plot(table(Edad), 
-       col=c("blue"),
-       ylab = "Número Pacientes", 
-       main="Distribución de Pacientes por Edad"
-  )
+estadisticosEdad <- function(d) {
+  cat("Resumen de la Edad:\n\n")
+  print(summary(d$Edad)) 
   
-  qplot(Edad, ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad")
-  qplot(table(Edad, Sexo), colours=c("red", "blue"))
-  boxplot(Edad)
+  cat("\n\n**Gráfica Edad.1** -> Distribución de pacientes por Edad - Histograma")
+  gg <- qplot(d$Edad, fill=d$Genero, 
+        ylab = "Número Pacientes", xlab="Edad",
+        main = "Distribución de Pacientes por Edad según Género")
+  print(gg)
+
+  cat("\n\n**Gráfica Edad.2** -> Distribución de pacientes por Edad - Boxplot")
+  print(
+    qplot(d$Genero, d$Edad, fill=d$Genero, geom="boxplot",
+          main = "Distribución de Pacientes por Edad según Género",
+          ylab = "Número Pacientes", xlab="Edad"))
   
-  boxplot(Edad~csv$Sexo)
+  cat("\n\n**Gráfica Edad.3** -> Distribución de pacientes por Edad - Jitter")
+  print(
+    qplot(d$Edad, d$nivel, colour=d$Genero, geom = "jitter",
+        ylab = "Edad", xlab="CRG-base",
+        main="Distribución de pacientes por Edad, CRG-base y Género."))
   
-  qplot(Edad, csv$Sexo, colour = csv$CRG, geom = "jitter", alpha = I(1 / 10))
-  qplot(csv$Sexo, geom = "histogram", fill=csv$CRG)
+#  quantile(d$Edad, probs = c(0.14, 0.28, 0.42, 0.56, 0.70, 0.86, 1.0) )
+#  
+#  #TODO: Hacer que esto se ejecute de forma dinámica. Rango lineal
+#  d[d$Edad >= 0 & d$Edad < 18, "RangoEdad"] <- "[0, 18)"
+#  d[d$Edad >= 18 & d$Edad < 29, "RangoEdad"] <- "[18, 29)"
+#  d[d$Edad >= 29 & d$Edad < 37, "RangoEdad"] <- "[29, 37)"
+#  d[d$Edad >= 37 & d$Edad < 48, "RangoEdad"] <- "[37, 48)"
+#  d[d$Edad >= 48 & d$Edad < 57, "RangoEdad"] <- "[48, 57)"
+#  d[d$Edad >= 57 & d$Edad < 66, "RangoEdad"] <- "[57, 66)"
+#  d[d$Edad >= 66 & d$Edad <= 98, "RangoEdad"] <- "[66, 98]"
+#  
+#  qplot(d$RangoEdad)
+#  
+#  cluster <- kmeans(d$Edad, 7, iter.max = 99, nstart = 1)
+#  
+#  d$RangoEdad <- cluster$cluster
+#  
+#  qplot(d$RangoEdad)
+#  
+#  for (i in 1:7) {
+#    print(summary(d[d$RangoEdad == i, "Edad"]))
+#  }
+#  
+#  #TODO: Hacer que esto se ejecute de forma dinámica. #Rango agrupando solo la Edad.
+#  d[d$Edad >= 0 & d$Edad <= 18, "RangoEdad"] <- "[0, 18]"
+#  d[d$Edad >= 19 & d$Edad < 33, "RangoEdad"] <- "[19, 33]"
+#  d[d$Edad >= 34 & d$Edad < 46, "RangoEdad"] <- "[34, 46]"
+#  d[d$Edad >= 47 & d$Edad < 57, "RangoEdad"] <- "[47, 57]"
+#  d[d$Edad >= 58 & d$Edad < 67, "RangoEdad"] <- "[58, 67]"
+#  d[d$Edad >= 68 & d$Edad < 78, "RangoEdad"] <- "[68, 78]"
+#  d[d$Edad >= 79 & d$Edad <= 98, "RangoEdad"] <- "[79, 98]"
+#  
+#  qplot(d$RangoEdad)
   
-  table(Sexo)/length(Sexo)
-  plot(table(Sexo), type="h", col = c("red", "blue"), lwd = 100)
+#  #Rango agrupando la edad y el género.
+#  a <- cbind(d$Sexo, d$Edad)
+#  cluster <- kmeans(a, 7, iter.max = 99, nstart = 1)
+#  a <- cbind(a, cluster$cluster)
+#  a <- as.data.frame(a)
+#  colnames(a) <- c("Sexo", "Edad", "cluster")
+#  
+#  qplot(a$cluster, a$Edad, geom="boxplot", fill=as.character(a$cluster),
+#        xlab="Sexo", ylab = "Edad", main = "Distribución de Pacientes por Edad y Género")
+#  min_1 <- min(a[a$cluster==1,"Edad"])
+#  
+#  min_2 <- min(a[a$cluster==2,"Edad"])
+#  min_3 <- min(a[a$cluster==3,"Edad"])
+#  min_4 <- min(a[a$cluster==4,"Edad"])
+#  min_5 <- min(a[a$cluster==5,"Edad"])
+#  min_6 <- min(a[a$cluster==6,"Edad"])
+#  min_7 <- min(a[a$cluster==7,"Edad"])
+#  
+#  max_1 <- max(a[a$cluster==1,"Edad"])
+#  max_2 <- max(a[a$cluster==2,"Edad"])
+#  max_3 <- max(a[a$cluster==3,"Edad"])
+#  max_4 <- max(a[a$cluster==4,"Edad"])
+#  max_5 <- max(a[a$cluster==5,"Edad"])
+#  max_6 <- max(a[a$cluster==6,"Edad"])
+#  max_7 <- max(a[a$cluster==7,"Edad"])
+#  
+#  RangoEdad <- cbind(c(min_1), c(max_1))
+#  RangoEdad <- rbind(RangoEdad, c(min_2, max_2))
+#  RangoEdad <- rbind(RangoEdad, c(min_3, max_3))
+#  RangoEdad <- rbind(RangoEdad, c(min_4, max_4))
+#  RangoEdad <- rbind(RangoEdad, c(min_5, max_5))
+#  RangoEdad <- rbind(RangoEdad, c(min_6, max_6))
+#  RangoEdad <- rbind(RangoEdad, c(min_7, max_7))
+#  
   
-  quantile(Edad, probs = c(0.14, 0.28, 0.42, 0.56, 0.70, 0.86, 1.0) )
-  
-  csv2 <- csv
-  
-  #Rango lineal.
-  csv2[csv$Edad >= 0 & csv$Edad < 18, "RangoEdad"] <- "[0, 18)"
-  csv2[csv$Edad >= 18 & csv$Edad < 29, "RangoEdad"] <- "[18, 29)"
-  csv2[csv$Edad >= 29 & csv$Edad < 37, "RangoEdad"] <- "[29, 37)"
-  csv2[csv$Edad >= 37 & csv$Edad < 48, "RangoEdad"] <- "[37, 48)"
-  csv2[csv$Edad >= 48 & csv$Edad < 57, "RangoEdad"] <- "[48, 57)"
-  csv2[csv$Edad >= 57 & csv$Edad < 66, "RangoEdad"] <- "[57, 66)"
-  csv2[csv$Edad >= 66 & csv$Edad <= 98, "RangoEdad"] <- "[66, 98]"
-  
-  qplot(csv2$RangoEdad)
-  
-  cluster <- kmeans(csv$Edad, 7, iter.max = 99, nstart = 1)
-  
-  csv2$RangoEdad <- cluster$cluster
-  
-  qplot(csv2$RangoEdad)
-  
-  for (i in 1:7) {
-    print(summary(csv2[csv2$RangoEdad == i, "Edad"]))
-  }
-  
-  #Rango agrupando solo la Edad.
-  csv2[csv$Edad >= 0 & csv$Edad <= 18, "RangoEdad"] <- "[0, 18]"
-  csv2[csv$Edad >= 19 & csv$Edad < 33, "RangoEdad"] <- "[19, 33]"
-  csv2[csv$Edad >= 34 & csv$Edad < 46, "RangoEdad"] <- "[34, 46]"
-  csv2[csv$Edad >= 47 & csv$Edad < 57, "RangoEdad"] <- "[47, 57]"
-  csv2[csv$Edad >= 58 & csv$Edad < 67, "RangoEdad"] <- "[58, 67]"
-  csv2[csv$Edad >= 68 & csv$Edad < 78, "RangoEdad"] <- "[68, 78]"
-  csv2[csv$Edad >= 79 & csv$Edad <= 98, "RangoEdad"] <- "[79, 98]"
-  
-  qplot(csv2$RangoEdad)
-  
-  #Rango agrupando la edad y el género.
-  d <- cbind(csv$Sexo, csv$Edad, csv$CRG)
-  cluster <- kmeans(d, 7, iter.max = 99, nstart = 1)
-  d <- cbind(d, cluster$cluster)
-  d <- as.data.frame(d)
-  colnames(d) <- c("Sexo", "Edad", "CRG", "cluster")
-  
-  qplot(d$cluster, d$Edad, geom="boxplot", fill=as.character(d$cluster),
-        xlab="Sexo", ylab = "Edad", main = "Distribución de Pacientes por Edad y Género")
-  
-  min_1 <- min(d[d$cluster==1,"Edad"])
-  min_2 <- min(d[d$cluster==2,"Edad"])
-  min_3 <- min(d[d$cluster==3,"Edad"])
-  min_4 <- min(d[d$cluster==4,"Edad"])
-  min_5 <- min(d[d$cluster==5,"Edad"])
-  min_6 <- min(d[d$cluster==6,"Edad"])
-  min_7 <- min(d[d$cluster==7,"Edad"])
-  
-  max_1 <- max(d[d$cluster==1,"Edad"])
-  max_2 <- max(d[d$cluster==2,"Edad"])
-  max_3 <- max(d[d$cluster==3,"Edad"])
-  max_4 <- max(d[d$cluster==4,"Edad"])
-  max_5 <- max(d[d$cluster==5,"Edad"])
-  max_6 <- max(d[d$cluster==6,"Edad"])
-  max_7 <- max(d[d$cluster==7,"Edad"])
-  
-  RangoEdad <- cbind(c(min_1), c(max_1))
-  RangoEdad <- rbind(RangoEdad, c(min_2, max_2))
-  RangoEdad <- rbind(RangoEdad, c(min_3, max_3))
-  RangoEdad <- rbind(RangoEdad, c(min_4, max_4))
-  RangoEdad <- rbind(RangoEdad, c(min_5, max_5))
-  RangoEdad <- rbind(RangoEdad, c(min_6, max_6))
-  RangoEdad <- rbind(RangoEdad, c(min_7, max_7))
-  
-  RangoEdad
-  
-  rm(RangoEdad)
-  rm(max_1)
-  rm(max_2)
-  rm(max_3)
-  rm(max_4)
-  rm(max_5)
-  rm(max_6)
-  rm(max_7)
-  rm(min_1)
-  rm(min_2)
-  rm(min_3)
-  rm(min_4)
-  rm(min_5)
-  rm(min_6)
-  rm(min_7)
+#  RangoEdad
+#  rm(RangoEdad)
+#  rm(max_1)
+#  rm(max_2)
+#  rm(max_3)
+#  rm(max_4)
+#  rm(max_5)
+#  rm(max_7)
+#  rm(max_6)
+#  rm(min_1)
+#  rm(min_2)
+#  rm(min_3)
+#  rm(min_4)
+#  rm(min_5)
+#  rm(min_6)
+#  rm(min_7)
+#  rm(a)
 }
 
 ## nivelCRG
@@ -547,18 +578,21 @@ estadisticosEdad <- function(Edad) {
 #  No tiene valores nulos. 
 #
 estadisticosNivelCRG <- function(nivelCRG) {
-  summary(nivelCRG)
-  is.na(nivelCRG)
-  melt(sort(table(nivelCRG)))
+  cat("\n\nResumen de la variable Nivel: \n")  
+  print(summary(nivelCRG))
+
+#  melt(sort(table(nivelCRG)))
+  cat("\n\nDistribución de la variable Nivel: \n\n")  
   plot(x=nivelCRG, 
        col=c("blue"),
        ylab = "Número Pacientes", 
        main="Distribución de Pacientes por CRG"
   )
   
+  cat("\n\nDistribución de la variable Nivel ordenando de menos a más: \n")  
   barplot(sort(table(nivelCRG)))
   
-  qplot(nivelCRG, ylab = "Número Pacientes", main = "Distribución de Pacientes por CRG")
+  #qplot(nivelCRG, xlab="CRG-base", ylab = "Número Pacientes", main = "Distribución de Pacientes por CRG-base", fill=I("blue"))
 }
 
 
@@ -571,7 +605,7 @@ estadisticosATCsVacios <- function(csv) {
   #ninguna dispensación.
   ATCs_vacios <- c()
   for (i in 7:752) {
-    if ( mean(csv[,i]) == 0) {
+    if ( min(csv[,i]) == 0 & max(csv[,i]) == 0) {
       ATCs_vacios <- rbind(ATCs_vacios, colnames(csv)[i])
     }
   } 
@@ -595,3 +629,27 @@ estadisticosPosATCsVacios <- function(csv) {
   
   return(ATCs_vacios)
 }
+
+## Función: cuentaMedicamentos
+#  Calcula el número de medicamentos distintos que ha tomado un paciente.
+#  
+#
+cuentaMedicamentos <- function(x) {
+  c <- 0
+  
+  for (i in 1:length(x) ) {
+    if ( x[i] > 0 ) {
+      c <- c + 1
+    }
+  }
+  return(c)
+}
+
+imprime <- function(v) {
+  cad <- ""
+  for (elemento in v) {
+    cad <- paste(cad, elemento, ",", sep="")
+  }
+  return (cad)
+}
+

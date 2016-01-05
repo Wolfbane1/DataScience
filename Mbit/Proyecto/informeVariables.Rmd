@@ -1,0 +1,88 @@
+---
+title: "Revisión de Variables"
+author: "Francisco Javier Gutiérrez Expósito"
+date: "19 de diciembre de 2015"
+output: html_document
+---
+
+#Carga de Datos 
+
+A continuación se carga la información de las variables.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+
+source("analisisbasico.R")
+
+#procesamos todos los ficheros y generamos el CSV final.
+csv <- procesaCSV(ficheroDestino)
+
+rm(ficheroDestino)
+rm(destinoCSV)
+rm(origenData)
+rm(origenMat)
+rm(ficheroTomanA10Destino)
+rm(ficheroNoTomanA10Destino)
+rm(cuentaMedicamentos)
+```
+
+#Información Básica de las variables
+
+Se realiza un análisis inicial de las variables básicas
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+for (anyo in unique(csv$Anyo)) {
+  cat(paste("##", anyo, "\n", sep = ""))
+  
+  d <- csv[csv$Anyo == anyo,]
+  
+  #Estadisticos básicos
+  cat("###Edad\n")
+  estadisticosEdad(d)
+  
+  cat("\n\n###Sexo\n")
+  estadisticosSexo(d$Genero)
+  
+  cat("\n\n###Id\n")
+  estadisticosId(d$Id)
+  
+  cat("\n\n###Nivel CRG-base\n")
+  estadisticosNivelCRG(d$nivel)
+  
+  #estadisticos(anyo,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+  rm(d)
+  
+  cat("\n\n")
+}
+```
+
+#Análisis Avanzado de las variables (sin tener en cuenta ATCs)
+
+Se realiza un análisis inicial contrastando varias variables de forma conjunta.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+for (anyo in unique(csv$Anyo)) {
+  cat(paste("##", anyo, "\n", sep = ""))
+  
+  d <- csv[csv$Anyo == anyo,]
+  
+  #Estadisticos básicos
+  cat("###Comparativa de Variables: \n\n")
+  ejecutaComparativa(d)
+  
+  #estadisticos(anyo,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+  rm(d)
+  
+  cat("\n\n")
+}
+```
+
+
+###Sub-Subtítulo
