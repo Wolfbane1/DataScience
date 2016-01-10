@@ -9,13 +9,16 @@ d <- read.csv("household_power_consumption.txt", sep=";", colClasses = c("charac
 #filtering to have only the Date specified.
 d <- subset(d, Date == "1/2/2007" | Date == "2/2/2007")
 
-#Creating a new column
+#Creating a new column 
 x <- paste(d$Date, d$Time)
 DateTime <- strptime(x, "%d/%m/%Y %H:%M:%S")
 d <- cbind(d, DateTime)
 rm(x)
 rm(DateTime)
 
+####################
+## PRINTING PLOTs
+####################
 #set workind directory to generate png file
 setwd("/Users/zzddfge/Documents/github/DataScience/DataScience_Course/Explanatory Analysis")
 

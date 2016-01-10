@@ -10,6 +10,10 @@ d <- read.csv("household_power_consumption.txt", sep=";", colClasses = c("charac
 #filtering to have only the Date specified.
 d <- subset(d, Date == "1/2/2007" | Date == "2/2/2007")
 
+####################
+## PRINTING PLOTs
+####################
+
 #set workind directory to generate png file
 setwd("/Users/zzddfge/Documents/github/DataScience/DataScience_Course/Explanatory Analysis")
 
@@ -21,5 +25,5 @@ hist(d$Global_active_power,
      col = "red", 
      main = "Global Active Power", 
      xlab = "Global Active Power (kilowatts)",
-     breaks = 12, ylim = c(0, 1200))
+     breaks = 12, ylim = c(0, 1200)) 
 dev.off()
