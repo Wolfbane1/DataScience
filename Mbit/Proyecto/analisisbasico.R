@@ -1,10 +1,12 @@
 
-library("ggplot2")  #Librería de gráficos "mínimos".
-library("lattice")  #Librería de gráficos para la comparativa de variables.
-library("sqldf")    #Librería para tratar con SQL los objetos DataFrame.
-library("R.matlab") #Librería para escribir los .mat
-library("reshape2")
-
+suppressMessages(library("ggplot2"))  #Librería de gráficos "mínimos".
+suppressMessages(library("grid"))
+suppressMessages(library("lattice"))  #Librería de gráficos para la comparativa de variables.
+suppressMessages(library("sqldf"))    #Librería para tratar con SQL los objetos DataFrame.
+suppressMessages(library("R.matlab")) #Librería para escribir los .mat
+suppressMessages(library("reshape2"))
+suppressMessages(library("crayon"))   #Librería para emitir textos de color. 
+  
 N <- 8
 
 ####################################

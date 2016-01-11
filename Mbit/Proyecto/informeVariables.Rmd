@@ -19,6 +19,14 @@ ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
 
+colorCRG <- c("tomato", 
+              "slateblue", "darkblue", "mediumblue", "blue", "steelblue", "deepskyblue", "skyblue", 
+                 "lightskyblue", "aliceblue",       
+              "saddlebrown", "brown", "chocolate", "burlywood", "wheat", "bisque", "blanchedalmond", "beige", 
+                 "cornsilk", "whitesmoke",  
+#              "seagreen" "darkseagreen", "olivedrab", "aquamarine",  "green", "lightseagreen", "springgreen", "palegreen", "mediumspringgreen", "cyan",  
+              "yellow" )
+
 source("analisisbasico.R")
 
 #procesamos todos los ficheros y generamos el CSV final.

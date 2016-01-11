@@ -55,6 +55,12 @@ source("analisisbasico.R")
 
 csv <- procesaCSV(ficheroDestino)
 
+
+
+
+
+
+
 #Liberamos sobre todo para liberar el espacio del environment dentro del RStudio.
 rm(ficheroDestino)
 rm(destinoCSV)
@@ -96,7 +102,7 @@ rm(ejecutaRangoEdad)
 rm(ejecutaComparativaRangoEdad)
 rm(estadisticos)
 rm(revisaDispensacionATCsDiabeticos)
-
+rm(imprime)
 
 for (anyo in unique(csv$Anyo)) {
   cat(paste("##", anyo, sep = ""))
@@ -107,6 +113,8 @@ for (anyo in unique(csv$Anyo)) {
   cat("###Edad")
   estadisticosEdad(d)
 }
+
+
 
 
 p <- qplot(d$Edad, ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad")
@@ -151,20 +159,40 @@ summary(d$Edad)
 
 #Tenemos que limpar las columnas que son ceros para 2011 y para 2012. 
 source("PCAs.R")
-source("clusterizacion.R")
 
 d11 <- eliminaATCsVacios(csv, 2011, 7:(ncol(csv)-N))
 d12 <- eliminaATCsVacios(csv, 2012, 7:(ncol(csv)-N))
 
-calculaPCA_nivel(d11, 7:(ncol(csv)-N))
+source("clusterizacion.R")
+
+calculaPCA_nivel_2(d11, 7:(ncol(d11)-N))
+
+cat("###Análisis de Existencia ")
+m <- calculaBurbujaATC(d11, m_existeFamilia)
+
+
+csv2 <- subset(csv, csv$Anyo == anyo)
+for (crg in unique(csv2$CRG)) {
+  cat(paste("CRG-base : ", crg, "\n\n", sep=""))
+  
+  plot(csv2[csv2$CRG == crg, "CRG"])
+  
+}
+
 
 rm(calculaPCA_nivel)
 rm(cuentaFamilias)
+rm(sumaFamilias)
 rm(eliminaATCsVacios)
 rm(obtieneExistencia)
 rm(reduceMatrizATC)
 rm(standMatrix)
 rm(standVector)
+rm(s)
+rm(calculaBurbujaATC)
+rm(calculaPCA_nivel1)
+rm(calculaPCA_nivel2)
+
 
 ################################
 ########## Calcula Matrices
@@ -177,10 +205,6 @@ d <- d11
 ATC.nivel2 <- unique(substr(colnames(d12)[7:(ncol(d12)-N)], 1, 3))
 m <- matrix(nrow=nrow(d12), ncol=length(ATC.nivel2))
 d <- d12
-
-
-
-
 
 #m.scaled <- scale(m, center=TRUE, scale=TRUE)
 
@@ -498,18 +522,25 @@ image(1:10, 1:40, t(dataMatrix)[, nrow(dataMatrix):1])
 #      evolución de medicamentos. 
 # --> Intersección de pacientes.
 
-#Vemos los pacientes que están en 2011 y en 2012.
-Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
-Si_2011_Si_2012 <- cbind(Si_2011_Si_2012, rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)), rep(0, nrow(Si_2011_Si_2012)))
-colnames(Si_2011_Si_2012) <- c("Id", "Genero_11", "Edad_11", "CRG_11", "Id_12", "Genero_12", "Edad_12", "CRG_12")
 
-for (i in 1:nrow(Si_2011_Si_2012) ) {
-  Si_2011_Si_2012[i, c("Id_12", "Genero_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Genero", "Edad", "CRG")]
-  
-  #print(paste("I = ", i, " D12 = ", d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Genero", "Edad", "CRG")], "\n"))
+cat("\n\n##Edad - Datos descriptivos\n\n")
+cat("Se muestra gráfica comparativa entre años 2011 y 2012 en la distribución por Edad\n\n")
+cat("Gráfica 2.- Distribución de Edad por Año\n\n")
+par(mfrow = c(length(unique(csv$Anyo)), 1), mar = c(4, 4, 2, 1))
+i <- 1
+for (anyo in unique(csv$Anyo)) {
+  plot(table(subset(csv$Edad, csv$Anyo==anyo)), 
+       main=paste("Distribución de Edad en ", anyo, sep=""), 
+       xlab = "Edad", ylab="Número de Pacientes", 
+       cex.axis = 0.7, type="h", col=colorAnyo[i])
+  i<- i + 1
 }
 rm(i)
+rm(Anyo)
 
+
+
+####EVOLUCION
 #Generamos el par old-new de los CRG.
 oldnew_distintos <- Si_2011_Si_2012[Si_2011_Si_2012$CRG_11 != Si_2011_Si_2012$CRG_12, c("CRG_11", "CRG_12")]
 oldnew_distintos[,"CRG_11"] <- as.character(oldnew_distintos[,"CRG_11"])

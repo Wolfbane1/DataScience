@@ -86,6 +86,7 @@ procesaAnyo <- function(anyo, dirAnyo) {
   #Iteramos sobre los ficheros del directorio. 
   for (fichero in ficheros) {
     #Procesamos el fichero
+    print(paste("Fichero:", file.path(dirAnyo, fichero), "Año:", anyo))
     d <- procesaFicheroMat( file.path(dirAnyo, fichero), fichero, anyo )
     
     #Vamos concatenando los ficheros.
