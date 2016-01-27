@@ -1,9 +1,12 @@
 ---
 title: "Revisión Datos a incluir en la Memoria"
 author: "Francisco Javier Gutiérrez Expósito"
-date: "9 de enero de 2016"
 output: html_document
 ---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 origenData <- file.path(getwd(), "data")
@@ -12,6 +15,8 @@ destinoCSV <- file.path(getwd(), "data", "csv")
 ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+
 colorAnyo <- c("springgreen2", "turquoise")
 colorGenero <- c("slateblue3", "snow4")
 #colorCRG <- c("tomato", 
@@ -21,20 +26,31 @@ colorGenero <- c("slateblue3", "snow4")
 #                 "cornsilk", "whitesmoke",  
 #              "seagreen" "darkseagreen", "olivedrab", "aquamarine",  "green", "lightseagreen", "springgreen", #"palegreen", "mediumspringgreen", "cyan",  
 #              "yellow" )
+#colorCRG <- c("thistle", 
+#              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
+#              "lemonchiffon", "red",       
+#              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", #"saddlebrown", 
+#              "pink", "yellow", "olivedrab", "navajowhite")
 colorCRG <- c("thistle", 
-              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
-              "lemonchiffon", "red",       
-              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", "saddlebrown", 
-              "pink", "yellow", "olivedrab", "navajowhite")
-
+             "green", "lemonchiffon", "lemonchiffon", "lemonchiffon", "red1", "lemonchiffon", "red2",
+             "slateblue", "red3",       
+              "yellow", "green1", "green2", "green3", "yellow", "yellow", "yellow", "red4", 
+              "blue", "darkblue", "darkgrey")
 
 source("analisisbasico.R")
 
-#procesamos todos los ficheros y generamos el CSV final.
-csv <- procesaCSV(ficheroDestino)
+#procesamos el CSV final.
+ficheros <- c(ficheroDestino, ficheroFiltro)
+csv <- procesaCSV(ficheros)
 
-#Como 2011 se ha generado en 2012, la Edad aparece "sumada 1", hay que restar.
-csv[csv$Anyo == 2011, "Edad"] <- csv[csv$Anyo == 2011, "Edad"] - 1
+#liberación de variables
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheros)
 ```
 
 #Revisión de Gráficas para la memoria.
@@ -58,9 +74,8 @@ cat("\n##Año - Datos descriptivos\n\n")
     Si_2011_Si_2012[i, c("Id_12", "Sexo_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Sexo", "Edad", "CRG")]
   }
   rm(i)
-  rm(d11)
-  rm(d12)
-  
+
+  #Gráfica Distribución por Año.
   Anyo <- factor(csv$Anyo)
   cuentas <- suppressMessages(sqldf("select Anyo, count(*) as total from csv group by Anyo"))
   plot(Anyo, xlab="Año", ylab="Número de pacientes", ylim=c(0, 12000), col=colorAnyo)
@@ -69,15 +84,39 @@ cat("\n##Año - Datos descriptivos\n\n")
   text(2, 11500, labels=c(cuentas[2,2]), adj=0.5, font=4, cex=0.9)
   abline(h=n, lwd=3, col="red")
   text(1, n+300, paste(n, " pacientes coincidentes entre ambos años"), col="red")
+  
+  #Gráfica Distribución por CRG de nuevos pacientes. 
+  No_2011_Si_2012 <- d12[!d12$Id %in% d11$Id, c("Id","Genero", "Edad", "CRG")]
+  Si_2011_No_2012 <- d11[!d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+
   rm(cuentas)
   rm(Anyo)
   rm(n)
+  #rm(Si_2011_Si_2012)  
+  rm(d11)
+  rm(d12)
+```
   
+  NOTA ANALISIS: Aunque la diferencia en el número de pacientes es de un 15,64% entre el 2011 y el 2012, realmente hay un incremento mayor de pacientes entre 2011 y 2012 por los siguientes motivos:
+  
+  - Hay un 9.46% (884) de pacientes que existen en 2011 y que no aparecen en el 2012. 
+  
+  - Hay un 25,61% (2.273) de pacientes que aparecen en 2012 y que no estaban en 2011. 
+  
+Teniendo en cuenta que se estima que 8/1000 habitantes tienen diabetes tipo 2 y 11-12/100.000 habitantes para tipo 1 (http://www.revespcardiol.org/es/epidemiologia-diabetes-sus-complicaciones-no/articulo/13032546/), y que el 1 de Enero del 2013 Fuenlabrada contaba con 202.230 habitantes (http://www.ayto-fuenlabrada.es/recursos/doc/SC/Sostenibilidad/30341_9696201512452.pdf) el incremento debería haber sido de 1.641 pacientes (19%) con respecto a 2011. 
+
+No obstante, no hay forma de determinar si este incremento de pacientes se debe a ser pacientes nuevos o que sean pacientes trasladados y, que ya estaban siendo tratados sin que tengamos esa información. 
+
+Fuenlabrada cuenta en la actualidad con 202.230 habitantes, según el último dato publicado en el momento de redactar este informe (INE, enero 2013).
+
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 cat("\n\n##Edad - Datos descriptivos\n\n")
   cat("Se muestra gráfica comparativa entre años 2011 y 2012 en la distribución por Edad\n\n")
-  cat("Gráfica 2.- Distribución de Edad por Año\n\n")
+  cat("<b>Gráfica 2.a- Distribución de Edad por Año</b>\n\n")
   par(mfrow = c(length(unique(csv$Anyo)), 1), mar = c(4, 4, 2, 1))
   i <- 1
+  #Sacamos las gráficas de distribución por Edad.
   for (anyo in unique(csv$Anyo)) {
     plot(table(subset(csv$Edad, csv$Anyo==anyo)), 
        xlab = "Edad", ylab="Número de Pacientes", 
@@ -85,12 +124,14 @@ cat("\n\n##Edad - Datos descriptivos\n\n")
     title(main=paste("Distribución de Edad en ", anyo, sep=""), cex.main=0.7)
     i<- i + 1
   }
-  rm(i)
-  rm(anyo)
-  
+```
+
+NOTA ANÁLISIS: En la distribución de edad se puede observar como el grueso de información corresponde a una diabetes tardía, fundamentalmente diabetes de tipo 2, que es el mayor % de diabetes. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 cat("\n\n##Sexo - Datos descriptivos\n\n")
   cat("Se muestra gráfica comparativa entre años 2011 y 2012 en la distribución por Sexo\n\n")
-  cat("Gráfica 3.- Distribución de Sexo por Año\n\n")
+  cat("<b>Gráfica 3.a.- Distribución de Sexo por Año</b>\n\n")
   par(mfrow = c(1, length(unique(csv$Anyo))), mar = c(4, 4, 3, 3))
   cuentas <- sqldf("select Anyo, Sexo, count(*) as total from csv group by Anyo, Sexo")
   
@@ -99,55 +140,163 @@ cat("\n\n##Sexo - Datos descriptivos\n\n")
     barplot(table(subset(csv$Sexo, csv$Anyo==Anyo)), col=colorGenero, width = 21, 
           cex.names = 0.7, cex.axis = 0.7, 
           xlab = "Sexo", ylab="Número de Pacientes", ylim=c(0, 6000))
-    title(main=paste("Distribución de Sexo en ", Anyo, sep=""), cex.main=0.7)
+    title(main=paste("Distribución de Sexo en ", Anyo, 
+                     ". Total Pacientes = ", cuentas[i,3] + cuentas[i+1,3], sep=""), cex.main=0.7)
     text(14, 3000, labels=c(cuentas[i,3]), adj=0.5, font=4, cex=0.9)
     text(40, 3000, labels=c(cuentas[i+1,3]), adj=0.5, font=4, cex=0.9)
     i <- i + 2
   }
   rm(cuentas)
   rm(i)
-  
-  
+```
+
+NOTA ANÁLISIS: Se observa que se mantiene la proporción de géneros entre 2011 y 2012. Siendo esta un 55% de Género 1 y un 45% del Género 2. 
+
+Debido a que los datos está anonomizados no se puede concluir si la proporción coincide con los datos estadísticos globales, pero en cualquier caso eso no sería significativo ya que solo tenemos los datos que se están tratando actualmente en el Hospital de Fuenlabrada. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE} 
+    #Sacamos las gráficas de distribución por Edad, coloreando el Género.
+  cat("<b>Gráfica 3.b.- Distribución de Edad, Año y Género</b>\n\n")
+  cuentas <- sqldf("select Anyo, Edad, Sexo, count(*) as total from csv group by Anyo, Edad, Sexo")
+  for (anyo in unique(cuentas$Anyo)) {
+    d <- subset(cuentas, cuentas$Anyo==anyo)
+    plot(subset(d, Sexo==1)$Edad, subset(d, Sexo==1)$total, 
+         xlab = "Edad", ylab="Número de Pacientes", 
+         cex.axis = 0.7, type="l", col=colorGenero[1], xaxt="n")
+    lines(subset(d, Sexo==2)$Edad, subset(d, Sexo==2)$total, col=colorGenero[2])
+    title(main=paste("Distribución de Edad y Género para ", anyo, sep=""), cex.main=0.7)
+    legend("topright", legend = c("Género 1", "Género 2"), fill=colorGenero)
+    axis(1,  at = unique(d$Edad), labels=unique(d$Edad), cex.axis=0.7)
+  }
+  rm(anyo)
+  rm(cuentas)
+```
+
+NOTA ANÁLISIS: Si resaltamos en la distribución a través del género se puede observar que a los 70 años hay una inversión de la distribución de mujeres y hombres. 
+
+Si confrontamos esta distribución con la gráfica de distribución de la población española según edad y sexo (referencia: http://blogdegeografiadejuan.blogspot.com.es/2014/01/distribucion-de-la-poblacion-espanola_17.html), vemos que puede ser explicativo por la mayor esperanza de vida de las mujeres con respecto a los hombres que se dispara a partir de los 70 años (ver gráfica al respecto). 
+
+<img src="/Users/zzddfge/Dropbox/Master/Proyecto/Memoria/imagenes/Ine_distrib_poblacion.png" WIDTH=600 HEIGHT=480>
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 #Gráfico 4 - CRG
 cat("\n\n##CRG - Datos descriptivos\n\n")
   cat("Se muestra gráfica comparativa entre años 2011 y 2012 en la distribución por CRG\n\n")
-  cat("Gráfica 4.- Distribución de CRG por Año\n\n")
-  cuentas <- sqldf("select Anyo, CRG, count(*) as total from csv group by Anyo, CRG")
-  #cuentas <- rbind(cuentas, c(2012, 9010, 0))
-  y <- 900
-  par(mfrow = c(1, 2), mar = c(4, 4, 3, 3))
-  barplot(table(subset(csv$CRG, csv$Anyo==2011)), col=colorCRG, width=21, 
-          las=2, cex.names = 0.7, cex.axis = 0.7, horiz=TRUE,
-          ylab = "CRG-base", xlab="Número de Pacientes")
-  title(main="Distribución de CRG-base en 2011", cex.name=0.7)
-  for (i in 1:21) {
-    text(y, i*21 + (i-1)*0.2*20, labels=c(cuentas[i,3]), adj=0.5, font=4, cex=0.6)
-  }
-  #t <- table(subset(d$CRG, d$Anyo==2012))
-  #t1 <- as.table(as.numeric(c(0)))
-  #rownames(t1) <- "9010"
-  #t <- t +t1
-  barplot(table(subset(csv$CRG, csv$Anyo==2012)), col=colorCRG, width=21, 
-          las=2, cex.names = 0.7, cex.axis = 0.7, horiz=TRUE,
-          ylab = "CRG-base", xlab="Número de Pacientes")
-  title(main="Distribución de CRG-base en 2012", cex.main=0.7)
-  for (i in 1:20) {
-    text(y, i*21 + (i-1)*0.2*20, labels=c(cuentas[i+21,3]), adj=0.5, font=4, cex=0.6)
+  cat("<b>Gráfica 4.a- Distribución de CRG por Año</b>\n\n")
+  cuentas <- cuentaCRGAño(csv)
+  par(mfrow = c(1, 2), mar = c(3, 3, 1, 1))
+
+  j <- 0
+  for ( anyo in unique(csv$Anyo)) {
+    d <- subset(cuentas, Anyo == anyo)
+    suma <- sum(d$total)
+    barplot(d$total, horiz=TRUE, beside = TRUE, las = 2, cex.names=0.7, cex.axis=0.7,col=colorCRG,
+          names=as.character(factor(d$CRG)))
+    title(paste(main="Distribución de Pacientes por CRG-base en ", anyo, sep=""), cex.main=0.7)
+    for (i in 1:21) {
+      text(1900, i+(i-1)*0.2-0.5, 
+         labels=c(paste(cuentas[i+21*j,3], " [", round(100*cuentas[i+21*j,3]/suma,2), "%]",sep="")), 
+                  adj=0.5, font=4, cex=0.6)
+    }
+    j<- j + 1
   }
   rm(i)
-  #rm(t)
-  #rm(t1)
-  rm(y)
+  rm(j)
+  rm(anyo)
+  rm(suma)
   rm(cuentas)
+```
+
+NOTA ANÁLISIS: En la distribución de pacientes por CRG-base se observan tres grandes grupos de pacientes:
+
+  a) CRG_base [5424]: Pacientes diabéticos solos con un 23% y un 21% respectivamente cada año. Se denotará por la tonalidad violeta del color. 
   
-  #Gráfico 5 - CRG, Sexo y Edad - Boxplot.
-  cat("\n\nGráfica 5.- Distribución de Pacientes por CRG y Sexo\n\n")
+  b) CRG_base [6141, 6143, 6145, 7023]: Pacientes diabéticos donde se mezcla la diabetes con otra enfermedad crónica (dominante, moderada y crónica respectivamente en grupo 6xxx o presenta una comorbobilidad de 2 o más enfermedades dominantes en grupo 7xxx), que representan un 24% y un 25% respectivamente cada año. Se denotará por la tonalidad rojo y granate del color.
+  
+  c) CRG_base [6144, 7070, 7071] Pacientes diabéticos que mezclan problemas de hipertensión (en distintos niveles de cronicidad) con un 38% y un 36% respectivamente cada año. Se denotará por la tonalidad azul del color. Adicionalmente, se diferenciará a lo largo del documento también por color aquellos grupos:
+    
+  d) CRG_base [6111, 7010, 7011, 7012] Pacientes diabéticos que mezclan problemas de fallos de corazón (grupo 6111, así como con otras enfermedades crónicas de Pulmón, Cerebrovascular u otra dominante en los grupos 7010, 7011 y 7012 resepectivamente) con un 2% y un 2,5% respectivamente cada año. Se denotará por la tonalidad verde del color. 
+    
+  e) CRG_base [Resto de grupos] Pacientes con otras condolencias como Asma, así como comorbolidades de Fallos Renales, problemas en las arterias, problemas pulmonar o enfermedad cerebrovasculares con un 12,75% y un 14,52% respectivamente cada año. Se denotará por la tonalidad amarilla del color.
+
+
+###CRG - Significancia estadística en las diferencia entre géneros
+
+NOTA ANÁLISIS: A priori parece que hay varias diferencias entre los distintos CRG-base para los géneros 1 y 2 respectivamente como se puede ver un poco más abajo en la gráfica 4.b. 
+
+####Chequeo de distribución normal.
+
+Vamos a chequear si la distribución de la edad sigue una distribución normal. Si fuera el caso usaríamos el Test de Student para analizar esa significancia estadística. En caso contrario habría que utilizar el Test de Wicoxon.
+
+Para chequear la significancia podemos chequear dos métodos: Test de Kolmogorov-Smirnov y Test de Lillieforst.
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  #Chequeo de Test Significancia
   for (anyo in unique(csv$Anyo)) {
-    cat(paste("\n\n Año ", anyo, "\n\n", sep=""))
+    Edad <- csv[csv$Anyo == anyo, "Edad"]
+    cat(paste("\n\n<b>Año:", anyo, "; Edad:", length(Edad), "</b>\n\n", sep=""))
+
+    suppressWarnings(kt <- ks.test(Edad, "pnorm"))
+    cat(paste("\n\n--> Test de Kolmogorov-Smirnov --> Estadístico: ", kt$statistic, 
+              "; p-value: ", kt$p.value, "\n\n", sep=""))
+    
+    kt <- lillie.test(Edad)
+    cat(paste("\n\n--> Test de Lillieforst --> Estadístico: ", kt$statistic, 
+              "; p-value: ", kt$p.value, "\n\n", sep=""))
+  }
+  rm(Edad)
+  rm(kt)
+  rm(anyo)
+```
+
+  a) Test de Kolmogorov-Smirnov: Según se indica en la siguiente referencia (http://www.graphpad.com/guides/prism/6/statistics/index.htm?interpreting_results_kolmogorov-smirnov_test.htm) un valor p-value bajo en el se concluye que los dos grupos pertenecen a una distribución diferente. Dado que hemos ejecutado el test con la Edad (distribución completa para el año sin diferenciar por género) con una distribución normal, y dado el p-value que nos ha salido, se implica que no pertenecen a la misma distribución. Por lo tanto, la Edad no sigue una distribución normal.
+  
+  b) Test de Lillieforst: La interpretacion del p-value es la misma que par Kolmogorov-Smirnov. 
+  
+NOTA ANÁLISIS: Por tanto se puede confirmar con ambos métodos que realmente la distribución de la Edad no sigue una distribución normal y, por tanto, no podemos utilizar el Test de Student para comprobar si existe significancia estadística sobre los datos. 
+
+####Wilcoxon Signed-Rank Test.
+
+Para interpretar lo que sale en el Test de Wilcoxon, hay que tener en cuenta lo siguiente:
+
+- La hipótesis nula implica que las dos poblaciones siguen una distribución idéntica.
+
+- Todo valor p-value < 0.05 (valor significativo) implica que se puede rechazar la hipótesis nula. 
+
+Es decir, para todo valor de p-value < 0.05 se puede determinar que la distribución de un CRG-base es diferente para cada género.
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  #Gráfico 4 - CRG, Sexo y Edad - Boxplot.
+  cat("\n\n<b>Gráfica 4.b.- Distribución de Pacientes por CRG y Sexo</b>\n\n")
+  for (anyo in unique(csv$Anyo)) {
+    cat(paste("\n\n <b>Año ", anyo, "</b>\n\n", sep=""))
+    
+    #Buscamos conseguir la lista de colores que tenemos que mostrar: 
+    #rojo para indicar que es significativo, negro para indicar que no.
+    color <- c()
+    cat("\n\n--> Ejecución de los Test de Wilcoxon con p-value < 0.05 \n\n")
+    for (i in unique(csv[csv$Anyo == anyo, "nivel"])) {
+      cb <- "black"
+      mu1 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 1)
+      mu2 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 2)
+      
+      if (length(mu1) > 4 & length(mu2) > 4 ) {
+        suppressWarnings(prueba <- wilcox.test(mu1, mu2))
+        if (round(prueba$p.value, 2) < 0.05 ) {
+          cb <- ifelse(length(mu1) <= 100 | length(mu2) <= 100, "red", "blue")
+        }
+
+        #Imprimimos para ver todos los resultados.
+        cat(red(paste("\t\tCRG-base = ", i, ", p-Value: ", round(prueba$p.value, 5), 
+                    ", Género 1: ", length(mu1), ", Género 2: ", length(mu2), "\n\n", sep="")))
+      }
+      color <- c(color, cb)
+    }
+    
     csv2 <- subset(csv, csv$Anyo == anyo)
     g <- ggplot(csv2, aes(x=nivel, y=Edad, fill=Genero)) + geom_boxplot(notch=TRUE) + 
       scale_fill_manual(values=colorGenero) +
-      theme(axis.text.x = element_text(size = 7, colour = "black")) + 
+      theme(axis.text.x = element_text(size = 7, colour = color)) + 
       theme(title = element_text(size = 7, colour = "black")) + 
       labs(x="CRG-base", y="Edad",
          title=paste("Distribución de pacientes según CRG-base y Sexo en ", anyo, sep=""))
@@ -156,41 +305,98 @@ cat("\n\n##CRG - Datos descriptivos\n\n")
   rm(anyo)
   rm(csv2)
   rm(g)
+  rm(i)
+  rm(color)
+  rm(mu1)
+  rm(mu2)
+  rm(prueba)
+```
 
+NOTA: Las etiquetas en color del eje X implica que para ese CRG-base el p-value del test de Wilcoxon es < 0.05. Nótese el color: En azul cuando ambas muestras (Género 1 y Género 2) son mayores de 100 elementos, en rojo en caso contrario (alguna de las muestras es inferior a 100). Para tener resultados robustos es necesario tener tamaños de muestras altas. 
+
+NOTA ANALISIS: Según lo anteriormente visto, se puede determinar que:
+
+- Año 2011: Los CRG-base 6140, 6143, 6144, 6145 y 7071 tienen una distribución significativamente distinta en el Género 1 y en el Género 2. Los CRG-base 7001, 7012, 7020 y 7023 también la tienen pero el tamaño de la muestra es inferior a 100 elementos.
+
+- Año 2012: Los CRG 6140, 6143, 6144, 7001 y 7071 tienen una distribución significativamente distinta en el Género 1 y en el Género 2. Los CRG-base 6111, 6130, 7012, 7020 y 7023 también aunque el tamaño de la muestra es inferior a 100 elementos. 
+
+Aunque hay una diferencia entre 2011 y 2012:
+
+- En 2011 los CRG-base 6111, 6130 no siguen una distribución distinta entre los géneros y en 2012 sí. Pero el número de pacientes es muy bajo en esos grupos CRG-base en 2011 y un poquito mayor en 2012.
+
+- El caso que resulta más curioso es el del grupo CRG-base del 6145. Con un número de elementos parecidos en ambos años, en 2011 si que parece que hay una distribución distinta entre Género 1 y Género 2, mientras que en 2012 no ocurre eso.
+
+    2011 --> CRG-base = 6145, p-Value: 0.00429, Género 1: 137, Género 2: 219
+    2012 --> CRG-base = 6145, p-Value: 0.49285, Género 1: 155, Género 2: 211
+
+TODO: ¿Habría que tratar de sacar de alguna información más para analizar esta incongruencia?
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
   #Gráfico 6 - CRG comparando los que toman medicamentos de Diabeticos vs el Total.
-  cat("\n\nGráfica 6.- Contraste de pacientes que toman ATCs diabéticos vs el total\n\n")
+  cat("\n\n<b>Gráfica 6.1 - Contraste de pacientes que toman ATCs diabéticos vs el total</b>\n\n")
   for (anyo in unique(csv$Anyo)) {
-    cat(paste("\n\n Año ", anyo, "\n\n", sep=""))
+    cat(paste("\n\n<b>Año ", anyo, "</b>\n\n", sep=""))
     
     #Filtramos por Año y cogemos todos los pacientes por CRG.
     csv2 <- subset(csv, csv$Anyo == anyo)
-    CRGs <- sqldf("select nivel, count(*) as Num_CRG, 'Total ATCs' as conDispensacion from csv2 group by nivel, null")
-    
+    CRGs <- sqldf("select nivel, count(*) as Num_CRG, 'ATC Total' as conDispensacion from csv2 group by nivel, null")
+  
     #Tabla con los pacientes, por CRG, que han tomado ATC de Diabéticos
     diabeticos <- as.data.frame(csv2[csv2$totalATCDiabeticos > 0, c("Id", "CRG")])
     colnames(diabeticos) <- c("Id", "nivel")
-    CRGs_diabeticos <- sqldf("select nivel, count(*) as Num_CRG, 'ATCs Diabeticos' as conDispensacion from diabeticos group by nivel")
+    CRGs_diabeticos <- sqldf("select nivel, count(*) as Num_CRG, 'ATC Diabeticos' as conDispensacion from diabeticos group by nivel")
     
     #Completamos en la tabla el total con los exclusivos de ATCs. 
-    CRGs <- rbind(CRGs, CRGs_diabeticos)
+    CRGs_filas <- rbind(CRGs, CRGs_diabeticos)
+    CRGs_columnas <- cbind(CRGs$Num_CRG, CRGs_diabeticos$Num_CRG, CRGs$Num_CRG - CRGs_diabeticos$Num_CRG)
+    colnames(CRGs_columnas) <- c("NumCRG", "NumCRGDiab", "Diferencia")
     
-    g <- barchart(as.character(CRGs$nivel) ~ CRGs$Num_CRG  | CRGs$conDispensacion, 
-                  data = CRGs, layout = c(2, 1), horizontal=TRUE,
-                  ylab="CRG-base", xlab="Número de pacientes con dispensaciones",
-                  groups= CRGs$conDispensacion)
+    g <- barchart( CRGs_filas$Num_CRG ~ as.character(CRGs_filas$nivel), 
+              data = CRGs_filas, horizontal = FALSE, auto.key=TRUE,
+              main="Relación de ATCs totales vs ATCs específicos para diabéticos",
+              xlab="CRG-base", ylab="Número de pacientes con dispensaciones",
+              groups= CRGs_filas$conDispensacion)
     print(g)
+
+    #Sacamos la gráfica de la diferencia solo
+    cat(paste("\n\n<b>Gráfica 6.2.", anyo, ", Total de diferencias: ", sum(CRGs_columnas[,3]), 
+              "</b>\n\n", sep=""))
+    par(mfrow=c(1,1))
+    max=max(CRGs_columnas[,3]) + 40
+    barplot(CRGs_columnas[,3], las = 2, cex.names=0.7, cex.axis=0.7, col=colorCRG, ylim=c(0,max),
+            names=as.character(factor(CRGs$nivel)))
+    title(paste(main="Distribución de pacientes que NO tienen dispensación de ATCs de Diabéticos en ", anyo, sep=""), cex.main=0.7)
+    for (i in 1:nrow(CRGs_columnas)) {
+      text(i+(i-1)*0.2-0.5, max - 20, 
+           labels=c(CRGs_columnas[i,3]), 
+           adj=0.5, font=4, cex=0.6)
+      text(i+(i-1)*0.2-0.5, max - 30, 
+           labels=c(paste(round(100*CRGs_columnas[i,3]/CRGs_columnas[i,1],1),"%", sep="")), 
+           adj=0.5, font=4, cex=0.6)
+    }
   }
+  rm(max)
   rm(anyo)
   rm(csv2)
   rm(CRGs_diabeticos)
+  rm(CRGs_filas)
+  rm(CRGs_columnas)
   rm(diabeticos)
   rm(CRGs)
   rm(g)
+```
 
+NOTA ANÁLISIS: En general quedan pocos pacientes que sigan sin tomar medicación de ATC de diabéticos. 
+
+Por la propia distribución de los nuevos pacientes puede que en base a diagnóstico se le haya detectado la enfermedad pero aún no tomen medicamentos o, que como son pacientes que vienen de otros hospitales no se tiene información de los ATCs que toman. 
+
+TODO: Chequear con el hospital. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
   #Gráfico 7 - CRG comparando los que toman medicamentos de Diabeticos vs el Total.
-  cat("\n\nGráfica 7.- % de distribución del CRG por Edad\n\n")
+  cat("\n\n<b>Gráfica 7.1 - Porcentaje de distribución del CRG-base[5 dígitos] por Edad</b>\n\n")
   for (anyo in unique(csv$Anyo)) {
-    cat(paste("\n\nAño", anyo, "\n\n"))
+    cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
     dx <- subset(csv, csv$Anyo == anyo)
     
     #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
@@ -202,18 +408,33 @@ cat("\n\n##CRG - Datos descriptivos\n\n")
 
     #Calculamos el %
     for (i in 1:nrow(df_crg)) {
-      df_crg[i, "Total %"] <- as.numeric(round(df_crg[i, "Total"] / df[df$Edad == df_crg$Edad[i], "Total"], 4))
+      df_crg[i, "Total %"] <- as.numeric(100*round(df_crg[i, "Total"] / df[df$Edad == df_crg$Edad[i], "Total"], 4))
     }
 
+    #Calculamos las gráficos que vamos a poner en el eje de Edad. 
+    pos1 <- as.integer(floor(quantile(dx$Edad, 0.25)))
+    pos3 <- as.integer(floor(quantile(dx$Edad, 0.5)))
+    pos5 <- as.integer(ceiling(quantile(dx$Edad, 0.75)))
+    pos2 <- as.integer((pos3-pos1)/2+pos1)
+    pos4 <- as.integer((pos5-pos3)/2+pos3)
+    p1_iqr <- pos1 - IQR(dx$Edad)
+    p5_iqr <- pos5 + IQR(dx$Edad)
+    n1 <- as.integer(p1_iqr/2)
+    n5 <- as.integer((max(dx$Edad) - p5_iqr)/2) + p5_iqr
+  
     #Pintamos el gráfico.
     g <- ggplot(df_crg,  
-            aes(x=Edad, y=`Total %`)) + geom_bar(stat="identity", aes(fill=df_crg$CRG)) + 
-          scale_fill_manual("CRG-base", values=colorCRG) +
-          theme(axis.text.x = element_text(size = 8, colour = "black")) + 
-          theme(title = element_text(size = 8, colour = "black")) + 
-          theme(legend.text = element_text(size = 6)) + 
-          theme(legend.key.height = unit (0.4, "cm")) + 
-          labs(x="Edad", y="%", title="% de distribución del CRG por Edad")
+                aes(x=Edad, y=`Total %`)) + geom_bar(stat="identity", aes(fill=df_crg$CRG)) + 
+      scale_fill_manual("CRG-base", values=colorCRG) +
+      scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
+      theme(axis.text.x = element_text(size = 8, 
+                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+#      annotate("text", x = as.integer(rownames(df_crg[df_crg$Edad == pos1,])[1])
+#             , y = 0.02, colour="red", size=3, label = " <---- Percentiles 25% y 75% ----> ") + 
+    labs(y="%", title="Porcentaje de distribución del CRG por Edad [5 dígitos]")
     print(g)
   }  
   rm(anyo)
@@ -221,29 +442,162 @@ cat("\n\n##CRG - Datos descriptivos\n\n")
   rm(df)
   rm(df_crg)
   rm(g)
-
-  #Significancia 
-  cat("\n\n A continuación se muestran los datos de significancia estadística para la diferencia de distribución entre los géneros")
-  for (anyo in unique(csv$Anyo)) {
-    cat(paste("\n\n Año ", anyo, "\n\n", sep=""))
-    
-    for (i in unique(csv$nivel)) {
-      mu1 <- subset(csv, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 1)
-      mu2 <- subset(csv, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 2)
-      if (nrow(mu1) > 1 & nrow(mu2) > 1 ) {
-        prueba <- t.test(mu1$Edad, mu2$Edad)
-        cat(red(paste("\n\n\t\tCRG-base = ", i, ", p-Value: ", round(prueba$p.value, 5), 
-                ", Género 1: ", nrow(mu1), ", Género 2: ", nrow(mu2), sep="")))
-      }
-    }
-  }
-  rm(anyo)
-  rm(i)
-  rm(prueba)
-  rm(mu1)
-  rm(mu2)
+  rm(pos1)
+  rm(pos2)
+  rm(pos3)
+  rm(pos4)
+  rm(pos5)
+  rm(p1_iqr)
+  rm(p5_iqr)
+  rm(n1)
+  rm(n5)
 ```
 
+NOTA: Nótese que las etiquetas del eje X que están en rojo corresponden a los bigotes del boxplot que delimitan los outliers, y las etiquetas en azul corresponden al Quartil 1 (25%) y al Quartil 3 (75%) de la población respectivamente.
+
+NOTA ANÁLISIS 2011: Para 2011, y en base de los colores establecidos previamente, se puede observar lo siguiente:
+  a) CRG_base [5424]: Conforme aumenta la edad, el número de pacientes disminuye. Es decir, conforme aumenta la edad, los pacientes van evolucionando a otros códigos CRG que presentan comorbilidades.
+  
+  b) CRG_base [6144, 7070, 7071] Conforme aumenta la edad la evolución más común es a diabetes e hipertensión. Un porcentaje evluciona de cronicidad a los grupos 7070 y 7071 que va evolucionando aumentando también conforme aumenta la edad hasta un 12% del número de pacientes del 6144. La evolución natural es a tener otra enfermedad crónica, siendo el número de casos cerebrovasculares muy reducido.
+      
+  c) CRG_base [6141, 6143, 6145, 7023]: Corresponde a la segunda evolución más común, presentando comorbolidad con otra enfermedad moderada en su mayoría, presentando colas para comorbilidades dominantes y crónicas respectivamente. El porcentaje de pacientes que evolucionan a tres comorbilidades crónicas es muy pequeño. 
+  
+  d) CRG_base [6111, 7010, 7011, 7012]: La evolución a presentar fallos de corazón es muy reducida, presentándose a partir de las edades más elevadas. 
+    
+    e) CRG_base [Resto de grupos] El resto de comorbilidades que se presentan (en grupos 6xxx y 7xxx) aumentan significativamente en edades muy mayores.
+    
+NOTA ANÁLISIS 2012: Para 2012 se puede observar como la proporción de pacientes con hipertensión y otras enfermedades crónicas aumentan con respecto a 2011, así como aquellos pacientes con incremento de enfermedades renales. 
+
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Gráfica 7.1.b - Porcentaje de distribución del CRG-base[5 dígitos] por Edad para pacientes comunes</b>\n\n")
+  for (anyo in unique(csv$Anyo)) {
+    cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
+    dx <- subset(csv, csv$Anyo == anyo)
+    
+    #Nos quedamos sólo con los pacientes comunes.
+    dx <- dx[dx$Id %in% Si_2011_Si_2012$Id, ]
+    
+    #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
+    df <- as.data.frame(sqldf("select Edad, count(*) as Total from dx group by Edad"))
+    df_crg <- as.data.frame(sqldf("select Edad, CRG, count(*) as Total from dx group by Edad, CRG"))
+    df_crg <- cbind(df_crg, rep(1.01, nrow(df_crg)))
+    df_crg$CRG <- factor(df_crg$CRG)
+    colnames(df_crg)[4] <- "Total %"
+
+    #Calculamos el %
+    for (i in 1:nrow(df_crg)) {
+      df_crg[i, "Total %"] <- as.numeric(100*round(df_crg[i, "Total"] / df[df$Edad == df_crg$Edad[i], "Total"], 4))
+    }
+
+    #Calculamos las gráficos que vamos a poner en el eje de Edad. 
+    pos1 <- as.integer(floor(quantile(dx$Edad, 0.25)))
+    pos3 <- as.integer(floor(quantile(dx$Edad, 0.5)))
+    pos5 <- as.integer(ceiling(quantile(dx$Edad, 0.75)))
+    pos2 <- as.integer((pos3-pos1)/2+pos1)
+    pos4 <- as.integer((pos5-pos3)/2+pos3)
+    p1_iqr <- pos1 - IQR(dx$Edad)
+    p5_iqr <- pos5 + IQR(dx$Edad)
+    n1 <- as.integer(p1_iqr/2)
+    n5 <- as.integer((max(dx$Edad) - p5_iqr)/2) + p5_iqr
+  
+    #Pintamos el gráfico.
+    g <- ggplot(df_crg,  
+                aes(x=Edad, y=`Total %`)) + geom_bar(stat="identity", aes(fill=df_crg$CRG)) + 
+      scale_fill_manual("CRG-base", values=colorCRG) +
+      scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
+      theme(axis.text.x = element_text(size = 8, 
+                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+#      annotate("text", x = as.integer(rownames(df_crg[df_crg$Edad == pos1,])[1])
+#             , y = 0.02, colour="red", size=3, label = " <---- Percentiles 25% y 75% ----> ") + 
+    labs(y="%", title="Porcentaje de distribución del CRG por Edad [5 dígitos]")
+    print(g)
+  }  
+  rm(anyo)
+  rm(dx)
+  rm(df)
+  rm(df_crg)
+  rm(g)
+  rm(pos1)
+  rm(pos2)
+  rm(pos3)
+  rm(pos4)
+  rm(pos5)
+  rm(p1_iqr)
+  rm(p5_iqr)
+  rm(n1)
+  rm(n5)
+```
+
+NOTA ANÁLISIS: Revisando los resultados de los gráficos anteriores, me ha surgido la duda sobre como sería el resultado de la evolución de los pacientes que son coincidentes exclusivamente. Así que he generado esta gráfica 7.1.b (solo para pacientes comunes).
+
+En la evolución de 2011 a 2012 se puede obsercar como los grupos 70xx aumentan a partir de avanzadas edad, "mordiendo" sobre la proporción de hipertensión. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Gráfica 7.2 - Porcentaje de distribución del CRG-base[3 dígitos] por Edad</b>\n\n")
+  colorCRG_3 <- c("thistle","green", "lemonchiffon", "lemonchiffon", "red1", "lemonchiffon", "green1",
+                  "red2", "blue", "grey")
+  
+  for (anyo in unique(csv$Anyo)) {
+    cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
+    dx <- subset(csv, csv$Anyo == anyo)
+    
+    #Añadimos el código de 3
+    dx$CRG <- substr(dx$CRG, 1, 3)
+    
+    #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
+    df <- as.data.frame(sqldf("select Edad, count(*) as Total from dx group by Edad"))
+    df_crg <- as.data.frame(sqldf("select Edad, CRG, count(*) as Total from dx group by Edad, CRG"))
+    df_crg <- cbind(df_crg, rep(1.01, nrow(df_crg)))
+    df_crg$CRG <- factor(df_crg$CRG)
+    colnames(df_crg)[4] <- "Total %"
+
+    #Calculamos el %
+    for (i in 1:nrow(df_crg)) {
+      df_crg[i, "Total %"] <- as.numeric(100*round(df_crg[i, "Total"] / df[df$Edad == df_crg$Edad[i], "Total"], 4))
+    }
+
+    #Calculamos las gráficos que vamos a poner en el eje de Edad. 
+    pos1 <- as.integer(floor(quantile(dx$Edad, 0.25)))
+    pos3 <- as.integer(floor(quantile(dx$Edad, 0.5)))
+    pos5 <- as.integer(ceiling(quantile(dx$Edad, 0.75)))
+    pos2 = as.integer((pos3-pos1)/2+pos1)
+    pos4 = as.integer((pos5-pos3)/2+pos3)
+    p1_iqr <- pos1 - IQR(dx$Edad)
+    p5_iqr <- pos5 + IQR(dx$Edad)
+    n1 <- as.integer(p1_iqr/2)
+    n5 <- as.integer((max(dx$Edad) - p5_iqr)/2)+ p5_iqr
+    
+    #Pintamos el gráfico.
+    g <- ggplot(df_crg,  
+                aes(x=Edad, y=`Total %`)) + geom_bar(stat="identity", aes(fill=df_crg$CRG)) + 
+      scale_fill_manual("CRG-base[3]", values=colorCRG_3) +
+      scale_x_continuous(name = "Edad", breaks=c(5, 15, pos1, pos2, pos3, pos4, pos5, 85, 95)) +
+      scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
+      theme(axis.text.x = element_text(size = 8, 
+                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+     labs(y="%", title="Porcentaje de distribución del CRG por Edad [3 dígitos]")
+    print(g)
+  }  
+  rm(anyo)
+  rm(dx)
+  rm(df)
+  rm(df_crg)
+  rm(g)
+  rm(pos1)
+  rm(pos2)
+  rm(pos3)
+  rm(pos4)
+  rm(pos5)
+```
+
+NOTA ANÁLISIS: No sé como lo veis vosotras, pero creo que es más claro el gráfico 7.1, donde están agrupados por los colores :-). 
 
 #Revisión de ATCs
 
@@ -253,23 +607,29 @@ A continuación se mostrará la información relacionado con los ATCs. Los pasos
 
 2.- Se van a crear tres matrices distintas (y se mostrarán las gráficas asociadas). Las tres matrices a crear son:
 
-
   a) Matriz de Existencia. Es decir, se marcará en las filas un 1 si el paciente toma medicamentos de ese grupo de familias y un 0 si no los toma.
-  
   
   b) Matriz de Cuenta de Familias. Es decir, se sumará el número de medicamentos distintos del grupo de familias. Es decir, si un paciente ha tomado 10 medicamentos del AA01AA y 4 del AA10AB se pondrá un 2.
   
-  
   c) Matriz de suma de dispensaciones. Es decir, se sumará el número de dispensaciones del grupo. En el ejemplo anterior tendría 14.
-  
 
+##Distribución de toma de ATCs por CRG-base de 5 elementos.
+
+A continuación se muestra para cada año, la gráfica de distribución de la toma de ATC relativo a cada uno de las matrices que se comentaban anteriormente. Importante comentar que la información que se muestra está relativizada al grupo CRG-base, es decir, no contempla los valores absolutos sino el % asociado al total del grupo CRG-Base.
+
+- Existencia de toma de algún medicamento de la Familia.
+
+- Número de medicamentos distintos.
+
+- Suma total de dispensaciones. 
+  
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 source("PCAs.R")
 
 #Iteramos por año.
 for (anyo in unique(csv$Anyo)) {
   #Generamos título Nivel 2
-  cat(paste("##Año ", anyo, "\n\n"))
+  cat(paste("###Año ", anyo, "\n\n"))
   
   #Generamos el conjunto de datos.
   dx <- eliminaATCsVacios(csv, anyo, 7:(ncol(csv)-N))
@@ -280,7 +640,7 @@ for (anyo in unique(csv$Anyo)) {
   m_existeFamilia <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "EXISTENCIA")
   
   #Generamos el gráfico de Existencia.
-  cat("###Análisis de Existencia \n\n")
+  cat("####Análisis de Existencia \n\n")
     m <- calculaBurbujaATC(dx, m_existeFamilia)
   
     #Pintamos el gráfico. 
@@ -298,7 +658,7 @@ for (anyo in unique(csv$Anyo)) {
   cat("\n\n")
       
   #Generamos el gráfico de Cuentas.
-  cat("###Análisis de Cuentas\n\n")
+  cat("####Análisis de Cuentas\n\n")
   
     #Generamos el dato definitivo
     m <- calculaBurbujaATC(dx, m_cuentaFamilias)
@@ -318,7 +678,7 @@ for (anyo in unique(csv$Anyo)) {
   cat("\n\n")
   
   #Generamos el gráfico de Suma
-  cat("###Análisis de Sumas\n\n")
+  cat("####Análisis de Sumas\n\n")
    
     #Generamos el dato definitivo
     m <- calculaBurbujaATC(dx, m_sumaFamilias)
@@ -337,7 +697,29 @@ for (anyo in unique(csv$Anyo)) {
     print(g)
     
   cat("\n\n\n")
+}
+```
+
+
+NOTA ANÁLISIS 2011: 
+
+  a) Matriz de Existencia: Los grupos G, L, P y V son los que menos existencias de disposiciones tienen. 
   
+  b) Matriz de Cuenta de Familias de ATC: Los grupos A, C y N son los que mayor proporción de medicamentos distintos toman. Los grupos B, J, M y R son los que le siguen.
+  
+  c) Matriz de Suma de Dispensaciones: Los grupos A y C, seguido por los grupos B y N son los que mayor proporción de dispensaciones tienen. 
+
+NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la distribución de la proporción de existencia con respecto a 2011 para ninguna de las matrices.
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Iteramos por año.
+for (anyo in unique(csv$Anyo)) {
+  #Generamos título Nivel 2
+  cat(paste("##Año ", anyo, "\n\n"))
+  
+  #Generamos el conjunto de datos.
+  dx <- eliminaATCsVacios(csv, anyo, 7:(ncol(csv)-N))
   #Generamos el gráfico para cada CRG.
   cat("###Generacíon de gráficas individuales por CRG-base\n\n")
   

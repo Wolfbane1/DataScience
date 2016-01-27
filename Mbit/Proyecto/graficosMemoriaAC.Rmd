@@ -1,0 +1,323 @@
+---
+title: "graficosAnalisisRegresion"
+author: "Francisco Javier Gutiérrez Expósito"
+date: "14 de enero de 2016"
+output: html_document
+---
+
+
+#Revisión de Análisis de Correspondencia 
+
+referencias: http://www.mathematica-journal.com/2010/09/an-introduction-to-correspondence-analysis/
+
+El análisis de correspondencia es una técnica estadística que ofrece una representación gráfica de una tabla de contingencia. Una tabla de contingencia surge siempre que es posible disponer de eventos en dos o más conjuntos de categorías distintas, como producto y localización, síntomas y tratamiento, etc. 
+
+Un concepto que se utiliza es Incercia. La inercia de una tabla de contingencia es la suma de los cuadrados de los elementos de la diagonal de la matriz. Los valores singulares de la matriz. 
+
+A continuación se mostrará la información relacionado con el análisis de correspondencia. Los pasos que se van a detallar son:
+
+1.- Análisis de Dos variables
+
+2.- Análisis de tres variables
+
+
+  a) Primero se hará sobre un ejemplo "ficticio" donde se conozcan las relaciones solo para poder evaluar que los resultados son los adecuados.
+  
+  
+  b) Posteriormente se realizará para el análisis de varias variables de forma conjunta.
+  
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+colorAnyo <- c("springgreen2", "turquoise")
+colorGenero <- c("slateblue3", "snow4")
+#colorCRG <- c("tomato", 
+#              "slateblue", "darkblue", "mediumblue", "blue", "steelblue", "deepskyblue", "skyblue", 
+#                 "lightskyblue", "aliceblue",       
+#              "saddlebrown", "brown", "chocolate", "burlywood", "wheat", "bisque", "blanchedalmond", "beige", 
+#                 "cornsilk", "whitesmoke",  
+#              "seagreen" "darkseagreen", "olivedrab", "aquamarine",  "green", "lightseagreen", "springgreen", #"palegreen", "mediumspringgreen", "cyan",  
+#              "yellow" )
+colorCRG <- c("thistle", 
+              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
+              "lemonchiffon", "red",       
+              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", "saddlebrown", 
+              "pink", "yellow", "olivedrab", "navajowhite")
+
+
+source("analisisbasico.R")
+source("ac.R")
+
+#procesamos el CSV final.
+csv <- procesaCSV(ficheroDestino)
+
+cat("\n\n")
+cat("##Año 2011")
+  anyo <- 2011
+  m <- getCRGDiabHipertension(anyo)
+
+  cat("\n\n")
+  cat("#Datos resumen de la matriz\n\n")
+  cat(paste("\n\n --> Número Filas:", nrow(m), sep=""))
+  cat(paste("\n\n --> Número Columnas:", ncol(m), sep=""))
+  cat(paste("\n\n --> Total:", sum(m), sep=""))
+
+  numb.dim.cols<-ncol(m)-1
+  numb.dim.rows<-nrow(m)-1
+  a <- min(numb.dim.cols, numb.dim.rows) #dimensionality of the table
+  labs<-c(1:a) #set the numbers that will be used as x-axis' labels on the Malinvaud's test scatterplot
+
+  # Tabla de Contingencia como Matriz
+  mydataasmatrix <- m
+```
+
+
+###Gráfico de Mosaico
+
+El gráfico mosaico representa los datos de una tabla de contingencia cuya área es proporcional a la frecuencia de cada elemento de la tabla. 
+
+  a) El color azul implica que la frecuencia es mayor con respecto del esperado. 
+  
+  b) El color rojo imlpica que la frecuencia es menor con respecto del esperado.
+
+NOTA: Más información en http://datavis.ca/online/mosaics/about.html
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico AC.1.", anyo, " - Mosaico de CRGs[5424, 6144, 7071] con respecto a las Familias ATCs", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico de CRGs[5424, 6144, 7071] con respecto a las Familias ATCs")
+```
+
+###Reducción de Dimensionalidad
+
+####Regla de la Media
+
+La regla de la media es un método según el cual los analistas pueden identificar todas las dimensiones que explican más de la mitad de la inercia (expresada en términos de porcentajes). Se calcula como 100 dividido entre el número de filas o columnas, el menor, al que se le resta 1. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  # Número de Dimensiones según la "regla de la media"
+  cat("\n\n")
+  cat("\n\nREGLA DE LA MEDIA\n\n")
+  c.dim<-round(100/(ncol(m)-1), digits=1)
+  r.dim<-round(100/(nrow(m)-1), digits=1)
+  thresh.sig.dim<-(max(c.dim, r.dim))
+  dataframe.after.ca<- summary(ca(m))
+  n.dim.average.rule <- length(which(dataframe.after.ca$scree[,3]>=thresh.sig.dim))
+  #cat(paste("\n\n --> Thresh:", thresh.sig.dim, "\n\n", sep=""))
+  cat(paste("\n\n --> Dimensionalidad Relevante según 'The Average Rule':", n.dim.average.rule))
+  
+  cat("\n\nDistribución de la inercia explicada por las dimensiones, con la línea de referncia correspondiente a la regla de la media\n\n")
+barplot(dataframe.after.ca$scree[,3], 
+        xlab="Dimensiones", 
+        ylab="% de Inercia", 
+        names.arg=dataframe.after.ca$scree[,1])
+abline(h=thresh.sig.dim)
+title (main="Regla de la Media: Porcentaje de inercia explicada por las dimensiones", 
+       sub="línea de referencia: límite de una solución óptima de dimensión según la regla de la media",
+       cex.main=0.80, cex.sub=0.80)
+```
+
+####Test de Malinvaud's
+
+El Test de Malinvaud chequea la significancia del resto de dimensiones una vez las primeras K han sido seleccionadas. Ralotomalala (2013) demostró de forma empírica que tiende a sobreestimar el número de dimensiones cuando el total de la tabla de contingencia incrementa.
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+# Malinvaud's Test
+  cat("\n\nMALINVAUD'S TEST")
+  malinv.ca<-CA(m, ncp=a, graph=FALSE)
+  malinv.test.rows <- a
+  malinv.test.cols <- 6
+  malinvt.output <-matrix(ncol= malinv.test.cols, nrow=malinv.test.rows)
+  colnames(malinvt.output) <- c("K", "Dimension", "Eigen value", "Chi-square", "df", "p value")
+  malinvt.output[,1] <- c(0:(a-1))
+  malinvt.output[,2] <- c(1:a)
+
+  for(i in 1:malinv.test.rows){
+    k <- -1+i
+    malinvt.output[i,3] <- malinv.ca$eig[i,1]
+    malinvt.output[i,5] <- (nrow(m)-k-1)*(ncol(m)-k-1)
+  }
+
+  malinvt.output[,4] <- rev(cumsum(rev(malinvt.output[,3])))*sum(m)
+  malinvt.output[,6] <- round(pchisq(malinvt.output[,4], malinvt.output[,5], lower.tail=FALSE), digits=6)
+  optimal.dimensionality <- length(which(malinvt.output[,6]<=0.05))
+
+  cat(paste("\n\n --> Dimensionalidad Óptima según Malinvaud's Test:", optimal.dimensionality, "\n\n", sep=""))
+
+  cat("\n\nDistribución de la correlación entre las filas y las columnas, con la línea de referencia de significancia sobre las dimensiones.\n\n")
+  perf.corr<-(1.0)
+  sqr.trace<-round(sqrt(sum(dataframe.after.ca$scree[,2])), digits=3)
+  barplot(c(perf.corr, sqr.trace), 
+          main="Malinvaud's Test: Coef. de correlación entre filas & columnas (=raiz cuadrada de la inercia)", 
+          sub="línea de referencia: límite de la correlación significativa ", 
+          ylab="Coeficiente de correlación", 
+          names.arg=c("Rango de coeficiente de correlación", "Coef. de correlación entre filas & columnas"), 
+          cex.main=0.70, cex.sub=0.50, cex.lab=0.80)
+  abline(h=0.20)
+
+  # Malinvaud's test Plot
+  cat("\n\nGráfica de prueba de Malinvaud's\n\n")
+  plot(malinvt.output[,6], , xaxt="n", xlim=c(1, a), xlab="Dimensiones", ylab="p value")
+  axis(1, at=labs, labels=sprintf("%.0f",labs))
+  title(main="Gráfica de Test de Mainvaud's", cex.sub=0.70,
+        sub="línea punteada: límite alpha 0.05", cex.sub=0.50,
+        col.sub="RED")
+  abline(h=0.05, lty=2, col="RED")
+```
+
+###Análisis de Correspondencia
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  
+#Pintamos las dimensiones según el Test de Molinvaud. 
+dims.to.be.plotted <- optimal.dimensionality
+
+# AC del paquete estándar.
+res.ca <- ca(m, nd=dims.to.be.plotted)
+
+# AC almacenamos el resultado para pintarlo después.
+cadataframe <- summary(ca(m, nd=dims.to.be.plotted))
+
+# Distribución de la contribución de las categorías de filas a las dimensiones con línea de referencia.
+# plot bar charts of contribution of row categories to the axes, and add a reference line
+cat("\n\n")
+cat("####Distribución de la contribución de las categorías\n\n")
+cat("\n\nFilas\n\n")
+counter <- 0
+for(i in seq(7, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  barplot(cadataframe$rows[,i], ylim=c(0,1000), 
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          names.arg=cadataframe$rows[,1], cex.lab=0.80)
+  abline(h=round(((100/nrow(m))*10), digits=0))
+}
+
+# plot bar charts of contribution of column categories to the axes, and add a reference line
+cat("\n\nColumnas\n\n")
+counter <- 0
+for(i in seq(7, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  barplot(cadataframe$columns[,i], ylim=c(0,1000), 
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          cex.lab=0.80,
+          names.arg=cadataframe$columns[,1])
+  abline(h=round(((100/ncol(m))*10), digits=0))
+}
+
+cat("\n\n")
+cat("####Correlación de categorías a Dimensiones\n\n")
+cat("\n\n Filas \n\n")
+counter <- 0
+for(i in seq(6, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  correl.rows <- round(sqrt((cadataframe$rows[,i]/1000)), digits=3)
+  barplot(correl.rows, ylim=c(0,1), 
+          xlab="Categorías de Filas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=cadataframe$rows[,1], cex.lab=0.80)
+}
+
+cat("\n\n Columnas \n\n")
+counter <- 0
+for(i in seq(6, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  correl.cols <- round(sqrt((cadataframe$columns[,i]/1000)), digits=3)
+  barplot(correl.cols, ylim=c(0,1),
+          xlab="Categorías de Columnas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=cadataframe$columns[,1], cex.lab=0.80)
+}
+
+## CA graphical outputs ##:
+# symmetric plots from FactoMineR package
+cat("\n\n")
+cat("####Salida del Análisis de Correspondencia\n\n")
+cat("\n\n Gráfico Simétrico \n\n")
+par(mfrow=c(1,1), mar=c(4,4,2,2))
+counter <- 1
+for(i in 2:dims.to.be.plotted){    
+  counter <- counter +1
+  plot(malinv.ca, axes=c(1,i), 
+       shadow=TRUE, cex=0.80, invisible="none", 
+       title = paste("AC Simétrico: Dim. 1 +", counter), cex.main=0.8)
+  #plot(malinv.ca, axes=c(1,i), shadow=TRUE, cex=0.80, invisible="col", title = paste("Correspondence #Analysis-symmetric rows map: Dim. 1 +", counter), cex.main=0.8)
+#  plot(malinv.ca, axes=c(1,i), shadow=TRUE, cex=0.80, invisible="row", title = paste("Correspondence #Analysis-symmetric cols map: Dim. 1 +", counter), cex.main=0.8)
+}
+
+# asymmetric biplots (Standard Biplots) from Greenacre's package: rows in principal coordinates and columns in standard coordinates times square root of the mass (Greenacre 2007, pp. 102, 234, 268, 270). NOTE: The lenght of each arrow joining the column points to the origin is proportional to the contribution that each column category makes to the principal axes; colour intensity proportional to the absolute contribution to the total inertia
+cat("\n\n Gráfico de relación bi-variable A-Simétrico \n\n")
+#cat("\n\n Asymmetric biplots from Greenacre's package: rows in principal coordinates and columns in standard #coordinates \n\n")
+counter <- 1
+for(i in 2:dims.to.be.plotted){    
+  counter <- counter +1
+  plot(res.ca, mass = FALSE, 
+       dim=c(1,i), contrib = "none", col=c("black", "red"), map ="rowgreen", arrows = c(FALSE, TRUE), 
+       main = paste("(F-T) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8)
+
+    plot(res.ca, mass = FALSE, 
+       dim=c(1,i), contrib = "absolute", col=c("black", "red"), map ="rowgreen", arrows = c(FALSE, TRUE), 
+       main = paste("(F-T) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+
+  plot(res.ca, mass = FALSE, 
+       dim=c(1,i), contrib = "none", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter))
+  
+  plot(res.ca, mass = FALSE, 
+       dim=c(1,i), contrib = "absolute", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+}
+
+## clustering after FactoMiner package:
+#ca.factom <- CA(mydata, ncp=dims.to.be.plotted, graph= FALSE)
+#resclust.rows<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="rows")
+#resclust.cols<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="columns")
+
+
+#rm(ncols)
+#rm(nrows)
+rm(numb.dim.rows)
+rm(numb.dim.cols)
+rm(optimal.dimensionality)
+rm(perf.corr)
+#rm(quality.cols)
+#rm(quality.rows)
+#rm(r.dim)
+#rm(res.ca)
+#rm(resclust.cols)
+#rm(user.dimensionality)
+rm(thresh.sig.dim)
+rm(sqr.trace)
+#rm(resclust.rows)
+rm(n.dim.average.rule)
+rm(malinvt.output)
+rm(malinv.test.cols)
+rm(malinv.test.rows)
+rm(malinv.ca)
+rm(labs)
+rm(k)
+rm(i)
+#rm(grandtotal)
+rm(dims.to.be.plotted)
+rm(dataframe.after.ca)
+rm(counter)
+rm(correl.cols)
+rm(correl.rows)
+rm(cadataframe)
+#rm(ca.factom)
+rm(a)
+rm(c.dim)
+#rm(mydata)
+rm(mydataasmatrix)
+#rm(data.w.colsum)
+#rm(data.w.rowsum)
+```

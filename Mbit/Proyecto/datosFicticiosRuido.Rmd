@@ -1,0 +1,823 @@
+---
+title: "Datos Ficticios"
+author: "Francisco Javier Gutiérrez Expósito"
+date: "15 de enero de 2016"
+output: html_document
+---
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+origenMat <- file.path(getwd(), "data", "mat")
+fichero_ruido <- "datos_ruidosos2.mat"
+
+#Librería que lee la estructura de un fichero de matlab.
+suppressPackageStartupMessages(library(R.matlab))
+suppressPackageStartupMessages(library(sqldf))
+suppressWarnings(suppressPackageStartupMessages(library("FactoMineR")))
+suppressWarnings(suppressPackageStartupMessages(library("factoextra")))
+suppressPackageStartupMessages(library("vcd"))
+suppressPackageStartupMessages(library("corrplot"))
+
+suppressWarnings(source("ac.R"))
+
+mat <- readMat(file.path(origenMat, fichero_ruido))
+df <- as.data.frame(cbind(as.vector(mat$x), as.vector(mat$y), as.vector(mat$z)))
+colnames(df) <- c("old_x", "y", "z")
+df <- cbind(df, rep(as.character("[0, 11)"), length(df$y)))
+colnames(df)[4] <- "x"
+df$x <- as.character(df$x)
+df[df$old_x >= 11 & df$old_x < 25, "x"] <- "[11, 25)"
+df[df$old_x >= 25 & df$old_x <= 40, "x"] <- "[25, 40]"
+df$x <- factor(df$x)
+```
+
+#1.- Análisis Dos Dimensiones
+
+##a) Variables: X(rango) --> Y
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos cuentas.
+suppressMessages(a <- sqldf("select x, y, count(*) as total from df group by x, y"))
+m <- getMatrizfromDF(a)
+m
+numb.dim.cols<-ncol(m)-1
+numb.dim.rows<-nrow(m)-1
+a <- min(numb.dim.cols, numb.dim.rows) #dimensionality of the table
+cat(paste("\n\nDimensionalidad de la tabla:", a, "\n\n", sep=""))
+labs<-c(1:a) #set the numbers that will be used as x-axis' labels on the Malinvaud's test scatterplot
+```
+
+###* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.a.ruido - Mosaico X vs Y</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Y")
+```
+
+Al igual que ocurre con el fichero sin ruido, parece que las varibles X e Y son independientes. Chequeemos con los otros dos métodos para verificar. 
+  
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, ncp = 5, graph = FALSE)
+eig <- get_eigenvalue(p)
+trace <- sum(eig$eigenvalue) 
+cor.coef <- sqrt(trace)
+cat(paste("\n\nInercia: ", round(trace, 4), " - Coeficiente: ", round(cor.coef, 4), sep=""))
+cat("\n\n")
+rm(eig)
+rm(trace)
+rm(cor.coef)
+
+```
+
+    Como se puede observar el valor es bastante menor a 0.2 por lo que parece apoyar la teoría que las variables son independientes. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>CHI^2</b>\n\n")
+suppressMessages(chisq <- chisq.test(m))
+chisq
+
+cat("\n\n")
+rm(chisq)
+```
+
+    Como se puede observar el estadístico es muy bajo por lo que también apoya que no hay dependencias de las variables. 
+
+###* Reducción de Dimensionalidad
+
+####Test de Malinvaud's
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Malinvaud's Test</b>\n\n")
+  malinv.ca<-CA(m, ncp=a, graph=FALSE)
+  malinv.test.rows <- a
+  malinv.test.cols <- 6
+  malinvt.output <-matrix(ncol= malinv.test.cols, nrow=malinv.test.rows)
+  colnames(malinvt.output) <- c("K", "Dimension", "Eigen value", "Chi-square", "df", "p value")
+  malinvt.output[,1] <- c(0:(a-1))
+  malinvt.output[,2] <- c(1:a)
+
+  for(i in 1:malinv.test.rows){
+    k <- -1+i
+    malinvt.output[i,3] <- malinv.ca$eig[i,1]
+    malinvt.output[i,5] <- (nrow(m)-k-1)*(ncol(m)-k-1)
+  }
+
+  malinvt.output[,4] <- rev(cumsum(rev(malinvt.output[,3])))*sum(m)
+  malinvt.output[,6] <- round(pchisq(malinvt.output[,4], malinvt.output[,5], lower.tail=FALSE), digits=6)
+  optimal.dimensionality <- length(which(malinvt.output[,6]<=0.05))
+
+  cat(paste("\n\n --> Dimensionalidad Óptima según Malinvaud's Test:", optimal.dimensionality, "\n\n", sep=""))
+
+  #cat("\n\nDistribución de la correlación entre las filas y las columnas, con la línea de referencia de significancia sobre las dimensiones.\n\n")
+  #perf.corr<-(1.0)
+  #sqr.trace<-round(sqrt(sum(dataframe.after.ca$scree[,2])), digits=3)
+  #barplot(c(perf.corr, sqr.trace), 
+#        main="Malinvaud's Test: Coef. de correlación entre filas & columnas (=raiz cuadrada de la inercia)", 
+#          sub="línea de referencia: límite de la correlación significativa ", 
+#          ylab="Coeficiente de correlación", 
+#          names.arg=c("Rango de coeficiente de correlación", "Coef. de correlación entre filas & columnas"), 
+#          cex.main=0.70, cex.sub=0.50, cex.lab=0.80)
+#  abline(h=0.20)
+
+  cat("\n\n- Gráfica de Test de Malinvaud's\n\n")
+  plot(malinvt.output[,6], xaxt="n", 
+       xlim=c(1, a), xlab="Dimensiones", ylab="p value")
+  axis(1, at=labs, labels=sprintf("%.0f",labs))
+  title(main="Gráfica de Test de Mainvaud's", cex.sub=0.70,
+        sub="línea punteada: límite alpha 0.05", cex.sub=0.50,
+        col.sub="red")
+  abline(h=0.05, lty=2, col="red")
+  cat("\n\n")
+  cat("\n\n")
+
+  #liberamos las variables.
+  rm(malinv.ca)
+  rm(malinv.test.rows)
+  rm(malinv.test.cols)
+  rm(malinvt.output)
+  rm(i)
+  rm(k)
+  rm(optimal.dimensionality)
+```
+
+P-Value > 0.05. No significancia estadística para rechazar la hipótesis de independencia.
+
+###Análisis de Correspondencia
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("####Distribución de la contribución de las categorías\n\n")
+  
+#Pintamos las dimensiones según el Test de Molinvaud. 
+dims.to.be.plotted <- 2
+
+# AC del paquete estándar.
+res.ca <- ca(m, nd=dims.to.be.plotted)
+
+# AC almacenamos el resultado para pintarlo después.
+cadataframe <- summary(ca(m, nd=dims.to.be.plotted))
+
+# Distribución de la contribución de las categorías de filas a las dimensiones con línea de referencia.
+# plot bar charts of contribution of row categories to the axes, and add a reference line
+cat("\n\n")
+cat("\n\n<b>Filas</b>\n\n")
+counter <- 0
+for(i in seq(7, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n")) 
+
+  barplot(cadataframe$rows[,i], ylim=c(0,1000), col="steelblue",
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          names.arg=rownames(m), cex.lab=0.80)
+  abline(h=round(((100/nrow(m))*10), digits=0), col="red", lty=2)
+}
+
+cat("\n\n<b>Columnas</b>\n\n")
+counter <- 0
+for(i in seq(7, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n")) 
+
+  barplot(cadataframe$columns[,i], ylim=c(0,1000), col="steelblue",
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          cex.lab=0.80,
+          names.arg=colnames(m))
+  abline(h=round(((100/ncol(m))*10), digits=0), col="red", lty=2)
+}
+cat("\n\n")
+cat("\n\n")
+
+cat("####Correlación de categorías a Dimensiones\n\n")
+cat("\n\n<b>Filas</b>\n\n")
+counter <- 0
+for(i in seq(6, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+
+  correl.rows <- round(sqrt((cadataframe$rows[,i]/1000)), digits=3)
+  barplot(correl.rows, ylim=c(0,1), 
+          xlab="Categorías de Filas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=rownames(m), cex.lab=0.80)
+}
+rm(correl.rows)
+
+cat("\n\n<b>Columnas</b>\n\n")
+counter <- 0
+for(i in seq(6, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+
+  correl.cols <- round(sqrt((cadataframe$columns[,i]/1000)), digits=3)
+  barplot(correl.cols, ylim=c(0,1),
+          xlab="Categorías de Columnas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=colnames(m), cex.lab=0.80)
+}
+rm(correl.cols)
+cat("\n\n")
+
+cat("####Salida del Análisis de Correspondencia\n\n")
+cat("\n\n<b>Gráfico Simétrico</b>\n\n")
+par(mfrow=c(1,1), mar=c(4,4,2,2))
+counter <- 1
+numb.dim.cols<-ncol(m)-1
+numb.dim.rows<-nrow(m)-1
+a <- min(numb.dim.cols, numb.dim.rows)
+p <- CA(m, ncp = 5, graph = FALSE)
+plot(p$row$coord, c(0,0,0), type = "p", pch = 16, col="blue",
+     xlim=c(-0.013*1.3, 0.013*1.3),
+     ylim=c(-0.012*1.1, 0.012*1.1),
+     xlab="Dimensión 1", ylab="",
+     main = "X vs Z", cex.main=0.7
+     )
+points(p$col$coord, c(0,0), type = "p", pch = 17, col="red")
+for (i in 1:nrow(m)) {
+  text(p$row$coord[i], 0.005, rownames(m)[i], col="blue", cex=0.6)
+}
+for (i in 1:ncol(m)) {
+  text(p$col$coord[i], -0.005, colnames(m)[i], col="red", cex=0.6)
+}
+abline(h=0,lty=2)
+abline(v=0,lty=2) 
+
+#plot(malinv.ca, axes=c(1,i), shadow=TRUE, cex=0.80, invisible="col", title = paste("Correspondence #Analysis-symmetric rows map: Dim. 1 +", counter), cex.main=0.8)
+#  plot(malinv.ca, axes=c(1,i), shadow=TRUE, cex=0.80, invisible="row", title = paste("Correspondence #Analysis-symmetric cols map: Dim. 1 +", counter), cex.main=0.8)
+
+# asymmetric biplots (Standard Biplots) from Greenacre's package: rows in principal coordinates and columns in standard coordinates times square root of the mass (Greenacre 2007, pp. 102, 234, 268, 270). NOTE: The lenght of each arrow joining the column points to the origin is proportional to the contribution that each column category makes to the principal axes; colour intensity proportional to the absolute contribution to the total inertia
+cat("\n\n Gráfico de relación bi-variable A-Simétrico \n\n")
+#cat("\n\n Asymmetric biplots from Greenacre's package: rows in principal coordinates and columns in standard #coordinates \n\n")
+
+#counter <- 1
+#for(i in 2:dims.to.be.plotted){    
+#  counter <- counter +1
+#  plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "none", col=c("black", "red"), map ="rowgreen", arrows = c(FALSE, TRUE), 
+#       main = paste("(F-T) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8)
+#  
+#    plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "absolute", col=c("black", "red"), map ="rowgreen", arrows = c(FALSE, TRUE), 
+#       main = paste("(F-T) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+#       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+#
+#  plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "none", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+#       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter))
+#  
+#  plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "absolute", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+#       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+#       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+#}
+
+## clustering after FactoMiner package:
+#ca.factom <- CA(mydata, ncp=dims.to.be.plotted, graph= FALSE)
+#resclust.rows<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="rows")
+#resclust.cols<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="columns")
+
+#Liberación de la memoria.
+rm(dims.to.be.plotted)
+rm(res.ca)
+rm(cadataframe)
+rm(counter)
+rm(i)
+```
+
+    Conclusión: La variable X(rango) y la variable Y son completamente independientes.
+
+##b) Variables: X(rango) --> Z
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos cuentas.
+suppressMessages(a <- sqldf("select x, z, count(*) as total from df group by x, z"))
+m <- getMatrizfromDF(a)
+
+numb.dim.cols<-ncol(m)-1
+numb.dim.rows<-nrow(m)-1
+a <- min(numb.dim.cols, numb.dim.rows) #dimensionality of the table
+cat(paste("\n\nDimensionalidad de la tabla:", a, "\n\n", sep=""))
+labs<-c(1:a) #set the numbers that will be used as x-axis' labels on the Malinvaud's test scatterplot
+```
+
+###* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.b.ruidoso - Mosaico X vs Z</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Z")
+```
+
+En este gráfico se puede observar que sigue apareciendo una desviación positiva con respecto a la independencia en los pares: x:1 - z:[0, 11), x:2 - z:[11,25), x:3 - y:[25, 40).
+
+Ha variado el resto de los datos, supongo que esto es el ruido que comentábais. Ahora ya no hay pares que no tengan ninguna frecuencia, pero se observa lo siguiente:
+  
+  a) x:1 - z:[25, 40], x:3 - z:[0,11) --> Tienen frecuencias muy por debajo con respecto a la independencia.
+  
+  b) x:2 - z:[25, 40], x:3 - z:[11,25) --> Tienen frecuencias por debajo de la independencia.
+  
+  b) x:1 - z:[11, 25), x:2 - z:[0, 11) --> Tienen frecuencias cercanas a la independencia.
+
+  En otras palabras, sigue viéndose un patrón entre x:1 y z:[0,11), x:2 y z:[11, 25) y x:3 y z:[25, 40] aunque algo menos intenso que sin el fichero de ruido. Vamos a ver qué dicen los test de independencia.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+eig <- get_eigenvalue(p)
+trace <- sum(eig$eigenvalue) 
+cor.coef <- sqrt(trace)
+cat("\n\n<b>Test de Inercia</b>\n\n")
+cat(paste("\n\nTrace: ", round(trace, 4), " - Coeficiente: ", round(cor.coef, 4), sep=""))
+cat("\n\n")
+rm(eig)
+rm(trace)
+rm(cor.coef)
+```
+
+Con un valor de 0.7 > 0.2 parece que hay una relación significativa. 
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Método de CHI^2</b>\n\n")
+chisq <- chisq.test(m)
+chisq
+cat("\n\n")
+rm(chisq)
+```
+
+  Como se puede observar ahora, la traza nos arroja un valor de 1.3 > 0.2 por lo que concluye que las variables tienen dependencias. El estadístio de CHI^2 también arroja un número alto que indica que hay dependencia entre las variables. 
+
+###* Reducción de Dimensionalidad
+
+####Test de Malinvaud's
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Malinvaud's Test</b>\n\n")
+  malinv.ca<-CA(m, ncp=a, graph=FALSE)
+  malinv.test.rows <- a
+  malinv.test.cols <- 6
+  malinvt.output <-matrix(ncol= malinv.test.cols, nrow=malinv.test.rows)
+  colnames(malinvt.output) <- c("K", "Dimension", "Eigen value", "Chi-square", "df", "p value")
+  malinvt.output[,1] <- c(0:(a-1))
+  malinvt.output[,2] <- c(1:a)
+
+  for(i in 1:malinv.test.rows){
+    k <- -1+i
+    malinvt.output[i,3] <- malinv.ca$eig[i,1]
+    malinvt.output[i,5] <- (nrow(m)-k-1)*(ncol(m)-k-1)
+  }
+
+  malinvt.output[,4] <- rev(cumsum(rev(malinvt.output[,3])))*sum(m)
+  malinvt.output[,6] <- round(pchisq(malinvt.output[,4], malinvt.output[,5], lower.tail=FALSE), digits=6)
+  optimal.dimensionality <- length(which(malinvt.output[,6]<=0.05))
+
+  cat(paste("\n\n --> Dimensionalidad Óptima según Malinvaud's Test:", optimal.dimensionality, "\n\n", sep=""))
+
+  #cat("\n\nDistribución de la correlación entre las filas y las columnas, con la línea de referencia de significancia sobre las dimensiones.\n\n")
+  #perf.corr<-(1.0)
+  #sqr.trace<-round(sqrt(sum(dataframe.after.ca$scree[,2])), digits=3)
+  #barplot(c(perf.corr, sqr.trace), 
+#        main="Malinvaud's Test: Coef. de correlación entre filas & columnas (=raiz cuadrada de la inercia)", 
+#          sub="línea de referencia: límite de la correlación significativa ", 
+#          ylab="Coeficiente de correlación", 
+#          names.arg=c("Rango de coeficiente de correlación", "Coef. de correlación entre filas & columnas"), 
+#          cex.main=0.70, cex.sub=0.50, cex.lab=0.80)
+#  abline(h=0.20)
+
+  # Malinvaud's test Plot
+  cat("\n\n- Gráfica de Test de Malinvaud's\n\n")
+  plot(malinvt.output[,6], xaxt="n", 
+       xlim=c(1, a), xlab="Dimensiones", ylab="p value")
+  axis(1, at=labs, labels=sprintf("%.0f",labs))
+  title(main="Gráfica de Test de Mainvaud's", cex.sub=0.70,
+        sub="línea punteada: límite alpha 0.05", cex.sub=0.50,
+        col.sub="red")
+  abline(h=0.05, lty=2, col="red")
+  cat("\n\n")
+  
+  #liberamos las variables.
+  rm(malinv.ca)
+  rm(malinv.test.rows)
+  rm(malinv.test.cols)
+  rm(malinvt.output)
+  rm(i)
+  rm(k)
+  rm(optimal.dimensionality)
+```
+
+Ahora se observa que hay dos dimensiones y, que además el P-Value < 0.05. 
+
+###Análisis de Correspondencia
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  
+#Pintamos las dimensiones según el Test de Molinvaud. 
+dims.to.be.plotted <- 2
+
+# AC del paquete estándar.
+res.ca <- ca(m, nd=dims.to.be.plotted)
+
+# AC almacenamos el resultado para pintarlo después.
+cadataframe <- summary(ca(m, nd=dims.to.be.plotted))
+
+cat("\n\n")
+cat("####Distribución de la contribución de las categorías\n\n")
+cat("\n\n<b>Filas</b>\n\n")
+
+counter <- 0
+for(i in seq(7, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+
+  barplot(cadataframe$rows[,i], ylim=c(0,1000), col="steelblue",
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          names.arg=rownames(m), cex.lab=0.80)
+  abline(h=round(((100/nrow(m))*10), digits=0), col="red", lty=2)
+}
+
+# plot bar charts of contribution of column categories to the axes, and add a reference line
+cat("\n\n<b>Columnas</b>\n\n")
+counter <- 0
+for(i in seq(7, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+  
+  barplot(cadataframe$columns[,i], ylim=c(0,1000), col="steelblue",
+          xlab="Categorías de Filas", 
+          ylab=paste("Contribución a Dim.", counter), 
+          cex.lab=0.80,
+          names.arg=colnames(m))
+  abline(h=round(((100/ncol(m))*10), digits=0), col="red", lty=2)
+}
+cat("\n\n")
+
+```
+
+Otra forma de ver la contribución de las filas y las columnas a las dimensiones es con este gráfico de burbujas.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, ncp = 5, graph = FALSE)
+
+cat("\n\n<b>Filas</b>\n\n")
+corrplot(p$row$contrib, is.corr=FALSE)
+
+cat("\n\n<b>Columnas</b>\n\n")
+corrplot(p$col$contrib, is.corr=FALSE)
+
+cat("\n\n")
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+cat("####Correlación de categorías a Dimensiones\n\n")
+cat("\n\n<b>Filas</b>\n\n")
+
+counter <- 0
+for(i in seq(6, ncol(cadataframe$rows), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+  
+  correl.rows <- round(sqrt((cadataframe$rows[,i]/1000)), digits=3)
+  barplot(correl.rows, ylim=c(0,1), 
+          xlab="Categorías de Filas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=rownames(m), cex.lab=0.80)
+}
+rm(correl.rows)
+
+cat("\n\n<b>Columnas</b>\n\n")
+counter <- 0
+for(i in seq(6, ncol(cadataframe$columns), 3)){    
+  counter <- counter +1
+  cat(paste("\n\n --> Dimensión", counter, "\n\n"))
+  
+  correl.cols <- round(sqrt((cadataframe$columns[,i]/1000)), digits=3)
+  barplot(correl.cols, ylim=c(0,1),
+          xlab="Categorías de Columnas", 
+          ylab=paste("Correlación con Dimensión ", counter), 
+          names.arg=colnames(m), cex.lab=0.80)
+}
+rm(correl.cols)
+
+## CA graphical outputs ##:
+# symmetric plots from FactoMineR package
+cat("\n\n")
+cat("####Salida del Análisis de Correspondencia\n\n")
+cat("\n\n<b>Gráfico Simétrico</b>\n\n")
+p <- CA(m, ncp = 5, graph = FALSE)
+xmin = min(p$row$coord[,1], p$col$coord[,1])[1] * 1.1
+xmax = max(p$row$coord[,1], p$col$coord[,1])[1] * 1.1
+ymin = min(p$row$coord[,2], p$col$coord[,2])[1] * 1.1
+ymax = max(p$row$coord[,2], p$col$coord[,2])[1] * 1.1
+plot(p$row$coord, type = "p", pch = 16, col="blue",
+     xlim=c(xmin, xmax),
+     ylim=c(ymin, ymax),
+     xlab="Dimensión 1", ylab="Dimensión 2",
+     main = "X vs Z", cex.main=0.7
+     )
+points(p$col$coord, type = "p", pch = 17, col="red")
+for (i in 1:nrow(m)) {
+  text(p$row$coord[i,1] + 0.015, p$row$coord[i,2] + 0.03, rownames(m)[i], col="blue", cex=0.6)
+}
+for (i in 1:ncol(m)) {
+  text(p$col$coord[i,1] + 0.015, p$col$coord[i,2] + 0.03, colnames(m)[i], col="red", cex=0.6)
+}
+abline(h=0,lty=2)
+abline(v=0,lty=2) 
+
+rm(xmin)
+rm(xmax)
+rm(ymin)
+rm(ymax)
+
+cat("\n\n <b>Gráfico de relación bi-variable A-Simétrico</b> \n\n")
+
+#counter <- 1
+for(i in 2:dims.to.be.plotted){    
+  counter <- counter +1
+#       main = paste("(F-T) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+#       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+#
+#  plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "none", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+#       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter))
+#  
+#  plot(res.ca, mass = FALSE, 
+#       dim=c(1,i), contrib = "absolute", col=c("black", "red"), map ="colgreen", arrows = c(TRUE, FALSE), 
+#       main = paste("(T-F) Biplot Estándar AC: Dim. 1 +", counter), cex.main=0.8,
+#       sub="Intensidad del color proporcional a la contribución absoluta a la inercia", cex.sub=0.60)
+  
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+  p1 <- fviz_ca_biplot(p, map ="rowprincipal", arrow = c(TRUE, FALSE))
+  plot(p1)
+  
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+  p1 <- fviz_ca_biplot(p, map ="colprincipal", arrow = c(FALSE, TRUE))
+  plot(p1)
+  
+  cat("\n\n --> Gráfico Asimétrico - RowGreen\n\n")
+  p1 <- fviz_ca_biplot(p, map ="colprincipal", arrow = c(TRUE, FALSE))
+  plot(p1)
+
+  cat("\n\n --> Gráfico Asimétrico - ColGreen\n\n")
+  p1 <- fviz_ca_biplot(p, map ="colprincipal", arrow = c(FALSE, TRUE))
+  plot(p1)
+  
+  rm(p1)
+}
+rm(dims.to.be.plotted)
+
+## clustering after FactoMiner package:
+#ca.factom <- CA(mydata, ncp=dims.to.be.plotted, graph= FALSE)
+#resclust.rows<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="rows")
+#resclust.cols<-HCPC(ca.factom, nb.clust=-1, metric="euclidean", method="ward", order=TRUE, #graph.scale="inertia", graph=FALSE, cluster.CA="columns")
+```
+
+    Conclusión: La variable X(rango) y la variable Z tienen un % de relación alto, pero como se puede observar en los gráficos asimétricos, la distancia de los puntos a las líneas es mayor, indicando menor dependencia.
+    
+##c) Variables: Y --> Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos cuentas.
+suppressMessages(a <- sqldf("select y, z, count(*) as total from df group by y, z"))
+m <- getMatrizfromDF(a)
+
+numb.dim.cols<-ncol(m)-1
+numb.dim.rows<-nrow(m)-1
+a <- min(numb.dim.cols, numb.dim.rows) #dimensionality of the table
+cat(paste("\n\nDimensionalidad de la tabla:", a, "\n\n", sep=""))
+labs<-c(1:a) #set the numbers that will be used as x-axis' labels on the Malinvaud's test scatterplot
+```
+
+###* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\n<b>Gráfico AC.c.ruidoso - Mosaico Y vs Z</b>\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico Y vs Z")
+```
+
+Tal y como esperábamos, la variable Z e Y deberían ser independientes entre sí. Verifiquemos con el test de CHI^2 y de la traza.
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Test de Incercia</b>\n\n")
+#p <- CA(m, ncp = 5, graph = FALSE)
+eig <- get_eigenvalue(p)
+trace <- sum(eig$eigenvalue) 
+cor.coef <- sqrt(trace)
+cat(paste("\n\nTrace: ", round(trace, 4), " - Coeficiente: ", round(cor.coef, 4), sep=""))
+cat("\n\n")
+
+rm(eig)
+rm(trace)
+rm(cor.coef)
+```
+
+    Como se puede observar el valor es bastante menor a 0.2 por lo que parece apoyar la teoría que las variables son independientes. 
+    
+  b) Usando el estadístico CHI^2. Suele ser un método más riguroso que el anterior. Un valor alto del estadístico indica una dependencia fuerte entre filas y columnas. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Método de CHI^2</b>\n\n")
+chisq <- chisq.test(m)
+chisq
+cat("\n\n")
+rm(chisq)
+```
+
+    Como se puede observar el estadístico es muy bajo por lo que también apoya que no hay dependencias de las variables. 
+
+###* Reducción de Dimensionalidad
+
+####Test de Malinvaud's
+
+El Test de Malinvaud chequea la significancia del resto de dimensiones una vez las primeras K han sido seleccionadas. Ralotomalala (2013) demostró de forma empírica que tiende a sobreestimar el número de dimensiones cuando el total de la tabla de contingencia incrementa.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Malinvaud's Test</b>\n\n")
+  malinv.ca<-CA(m, ncp=a, graph=FALSE)
+  malinv.test.rows <- a
+  malinv.test.cols <- 6
+  malinvt.output <-matrix(ncol= malinv.test.cols, nrow=malinv.test.rows)
+  colnames(malinvt.output) <- c("K", "Dimension", "Eigen value", "Chi-square", "df", "p value")
+  malinvt.output[,1] <- c(0:(a-1))
+  malinvt.output[,2] <- c(1:a)
+
+  for(i in 1:malinv.test.rows){
+    k <- -1+i
+    malinvt.output[i,3] <- malinv.ca$eig[i,1]
+    malinvt.output[i,5] <- (nrow(m)-k-1)*(ncol(m)-k-1)
+  }
+
+  malinvt.output[,4] <- rev(cumsum(rev(malinvt.output[,3])))*sum(m)
+  malinvt.output[,6] <- round(pchisq(malinvt.output[,4], malinvt.output[,5], lower.tail=FALSE), digits=6)
+  optimal.dimensionality <- length(which(malinvt.output[,6]<=0.05))
+
+  cat(paste("\n\n --> Dimensionalidad Óptima según Malinvaud's Test:", optimal.dimensionality, "\n\n", sep=""))
+
+  #cat("\n\nDistribución de la correlación entre las filas y las columnas, con la línea de referencia de significancia sobre las dimensiones.\n\n")
+  #perf.corr<-(1.0)
+  #sqr.trace<-round(sqrt(sum(dataframe.after.ca$scree[,2])), digits=3)
+  #barplot(c(perf.corr, sqr.trace), 
+#        main="Malinvaud's Test: Coef. de correlación entre filas & columnas (=raiz cuadrada de la inercia)", 
+#          sub="línea de referencia: límite de la correlación significativa ", 
+#          ylab="Coeficiente de correlación", 
+#          names.arg=c("Rango de coeficiente de correlación", "Coef. de correlación entre filas & columnas"), 
+#          cex.main=0.70, cex.sub=0.50, cex.lab=0.80)
+#  abline(h=0.20)
+
+  # Malinvaud's test Plot
+  cat("\n\n- Gráfica de Test de Malinvaud's\n\n")
+  plot(malinvt.output[,6], xaxt="n", 
+       xlim=c(1, a), xlab="Dimensiones", ylab="p value")
+  axis(1, at=labs, labels=sprintf("%.0f",labs))
+  title(main="Gráfica de Test de Mainvaud's", cex.sub=0.70,
+        sub="línea punteada: límite alpha 0.05", cex.sub=0.50,
+        col.sub="red")
+  abline(h=0.05, lty=2, col="red")
+  cat("\n\n")
+  
+  #liberamos las variables.
+  rm(malinv.ca)
+  rm(malinv.test.rows)
+  rm(malinv.test.cols)
+  rm(malinvt.output)
+  rm(i)
+  rm(k)
+  rm(optimal.dimensionality)
+```
+
+P-Value > 0.05. No significancia estadística para rechazar la hipótesis de independencia.
+
+#2.- Análisis Tres Dimensiones
+
+##a) Variables: X(rango), Y, Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos la tabla de Contingencia para el gráfico de Mosaico.
+m <- xtabs(~ df$x + df$z + df$y )
+  
+#Preparamos la matriz para el MCA
+dt <- df[,2:4]
+dt$x <- paste("x_", dt$x, sep="")
+dt$y <- paste("y_", dt$y, sep="")
+dt$z <- paste("z_", dt$z, sep="")
+dt <- as.matrix(dt)
+
+p <- MCA(dt, ncp = 5, graph = FALSE)
+rm(dt)
+```
+
+###* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico MAC.ruidoso - Mosaico X, Y, Z\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico X, Y, Z")
+```
+
+Al igual que ocurre con el fichero sin ruido, se observa que al meter la tercera variable se sigue el mismo patrón que en análisis de dos a dos.  
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+eig <- get_eigenvalue(p)
+trace <- sum(eig$eigenvalue) 
+cor.coef <- sqrt(trace)
+cat("\n\n<b>Método de Inercia</b>\n\n")
+cat(cor.coef)
+cat("\n\n")
+rm(eig)
+rm(trace)
+rm(cor.coef)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Explicación de la varianza</b>\n\n")
+fviz_screeplot(p, addlabels=TRUE) 
+
+cat("\n\n- Resumen del MCA\n\n")
+summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
+
+```
+
+
+Aquí se puede observar que se nota el ruido provocando que las otras dimensiones aporten más. Sin ruido las dos primeras dimensiones aportaban casi 79% pero con ruido, hace falta la tercera dimensión para llegar a ese nivel de explicación de la varianza. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Análisis MCA</b>\n\n")
+fviz_mca_var(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n- Gráfico Filtrando para que muestre las variables que contribuyan +0.4\n\n")
+fviz_mca_var(p, select.var = list(cos2 = 0.4))
+```
+
+Ocurre lo mismo que en el fichero sin ruido. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n- Descripción de valores por Dimensión\n\n")
+var <- get_mca_var(p)
+cat("       Dim 1   Dim 2   Dim 3   Dim 4\n\n")
+for (i in 1:nrow(var$coord)) {
+  s <- paste("[", rownames(var$coord)[i], "]", sep="")
+  for (j in 1:ncol(var$coord)) {
+    s <- paste(s, round(var$coord[i,j], 4))
+  }
+  
+  cat(paste(s, "\n\n"))
+}
+rm(i)
+rm(j)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(2,3), mode="rowprincipal", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+#fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE), geom=c("text"))
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE))
+
+  cat("\n\n --> Gráfico Asimétrico - RowGreen\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="rowgreen", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColGreen\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colgreen", arrows=c(FALSE, TRUE))
+
+
+library("scatterplot3d")
+x <- p$var$coord[,1]
+y <- p$var$coord[,2]
+z <- p$var$coord[,3]
+graf <- scatterplot3d(x,y,z)
+for (i in 1:length(p$var$coord[,1])) {
+  text(graf$xyz.convert(p$var$coord[,1][i],p$var$coord[,2][i],p$var$coord[,3][i]), 
+       labels=names(p$var$coord[,1])[i], pos=1) 
+}
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#rm(ncols)
+#rm(nrows)
+rm(numb.dim.rows)
+rm(numb.dim.cols)
+#rm(optimal.dimensionality)
+#rm(perf.corr)
+#rm(quality.cols)
+#rm(quality.rows)
+#rm(r.dim)
+#rm(res.ca)
+#rm(resclust.cols)
+#rm(user.dimensionality)
+#rm(thresh.sig.dim)
+#rm(sqr.trace)
+#rm(resclust.rows)
+#rm(n.dim.average.rule)
+rm(labs)
+#rm(grandtotal)
+#rm(dataframe.after.ca)
+#rm(correl.cols)
+#rm(correl.rows)
+#rm(ca.factom)
+rm(a)
+#rm(c.dim)
+#rm(mydata)
+#rm(mydataasmatrix)
+#rm(data.w.colsum)
+#rm(data.w.rowsum)
+```

@@ -1,0 +1,242 @@
+---
+title: "graficosAnalisisRegresion"
+author: "Francisco Javier Gutiérrez Expósito"
+date: "22 de enero de 2016"
+output: html_document
+---
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+
+colorAnyo <- c("springgreen2", "turquoise")
+colorGenero <- c("slateblue3", "snow4")
+#colorCRG <- c("tomato", 
+#              "slateblue", "darkblue", "mediumblue", "blue", "steelblue", "deepskyblue", "skyblue", 
+#                 "lightskyblue", "aliceblue",       
+#              "saddlebrown", "brown", "chocolate", "burlywood", "wheat", "bisque", "blanchedalmond", "beige", 
+#                 "cornsilk", "whitesmoke",  
+#              "seagreen" "darkseagreen", "olivedrab", "aquamarine",  "green", "lightseagreen", "springgreen", #"palegreen", "mediumspringgreen", "cyan",  
+#              "yellow" )
+colorCRG <- c("thistle", 
+              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
+              "lemonchiffon", "red",       
+              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", "saddlebrown", 
+              "pink", "yellow", "olivedrab", "navajowhite")
+
+source("analisisbasico.R")
+source("ac.R")
+
+#procesamos el CSV final.
+ficheros <- c(ficheroDestino, ficheroFiltro)
+csv <- procesaCSV(ficheros)
+
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheros)
+```
+
+#Revisión de Análisis de Correspondencia 
+
+Vamos a generar el análisis de correspondencia primero de dos variables:
+
+##AC Simple: ATCs - CRG: 5424, 6144, 7071.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n")
+cat("###Año 2011")
+  anyo <- 2011
+  m <- getCRGDiabHipertension(anyo)
+  labs <- EscribeDimensionalidadTabla(m)
+```
+
+NOTA ANÁLISIS: En la tabla de contingencia se observa que todas las frecuencias son superiores a 5, por lo que es apropiado que utilicemos luego el método de Chi^2. Si no fuera el caso, deberíamos utilizar el método de Fisher. 
+
+###Gráfico de Mosaico
+
+NOTA: El gráfico mosaico representa los datos de una tabla de contingencia cuya área es proporcional a la frecuencia de cada elemento de la tabla. 
+
+  a) El color azul implica que la frecuencia es mayor con respecto del esperado en caso de ser datos aleatorios. 
+  b) El color rojo imlpica que la frecuencia es menor con respecto del esperado en caso de ser datos aleatorios.
+
+NOTA: Más información en http://datavis.ca/online/mosaics/about.html
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico AC.1.", anyo, " - Mosaico de ATCs - CRGs[5424, 6144, 7071]", sep=""))
+
+#Se pinta el mosaico con la información ordenada "alfabéticamente"
+#mosaicplot(m, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
+
+#Se reorganiza el mosaico para agrupar la información 
+v <- c(6, 4, 7, 1, 9, 3, 5, 13, 10, 2, 12, 8, 11, 14)
+cols = 3
+rows = 1
+m1 <- matrix(m[v[1],], ncol = cols, nrow=rows)
+for ( i in 2:length(v)) {
+  m1 <- rbind(m1, m[v[i],])
+}
+rownames(m1) <- rownames(m)
+for ( i in 1:length(v)) {
+  rownames(m1)[i] <- rownames(m)[v[i]]
+}
+
+mosaicplot(m1, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
+
+rm(m1)
+rm(cols)
+rm(rows)
+rm(v)
+```
+
+NOTA ANÁLISIS: Tal y como se puede observar en la gráfica (se ha reordenado la información para que aparezcan las columnas juntas aquellas que tienen información común) de cara que sea mejor o más sencillo interpretar el gráfico. 
+
+Como primer vistazo se puede identificar:
+
+  a) H, D, J son ATCs con un comportamiento similar en relación a los valores 5424 y 7071. 
+  
+  b) A, M son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 5424.
+  
+  c) C, G, S son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 6144. 
+  
+  d) N, B, R son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 7071. 
+  
+  e) L, P, V son ATCs con pocos valores, en comparación al resto, y que no parece identificarse con ningún CRG-base de los tres en análisis. 
+  
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+NOTA ANALISIS: En este caso la inercial (0.0898) es menor a la "regla gorda" que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.  
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+NOTA ANÁLISIS: Tenemos un estadístico de 23.447,3 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 23.447 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+NOTA: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+NOTA ANÁLISIS: Se observa que la relación entre los grupos de ATCs que se podían visualizar en el gráfico de mosaico se ven representadas. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p, 2, "colprincipal")
+```
+
+NOTA ANÁLISIS: 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n")
+cat("###Año 2012")
+  anyo <- 2012
+  m <- getCRGDiabHipertension(anyo)
+  labs <- EscribeDimensionalidadTabla(m)
+```
+
+NOTA ANÁLISIS: 
+
+###Gráfico de Mosaico
+
+NOTA: El gráfico mosaico representa los datos de una tabla de contingencia cuya área es proporcional a la frecuencia de cada elemento de la tabla. 
+
+  a) El color azul implica que la frecuencia es mayor con respecto del esperado en caso de ser datos aleatorios. 
+  b) El color rojo imlpica que la frecuencia es menor con respecto del esperado en caso de ser datos aleatorios.
+
+NOTA: Más información en http://datavis.ca/online/mosaics/about.html
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico AC.1.", anyo, " - Mosaico de ATCs - CRGs[5424, 6144, 7071]", sep=""))
+
+#Se pinta el mosaico con la información ordenada "alfabéticamente"
+#mosaicplot(m, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
+
+#Se reorganiza el mosaico para agrupar la información 
+v <- c(6, 4, 7, 1, 9, 3, 2, 5, 10, 12, 13, 8, 11, 14)
+cols = 3
+rows = 1
+m1 <- matrix(m[v[1],], ncol = cols, nrow=rows)
+for ( i in 2:length(v)) {
+  m1 <- rbind(m1, m[v[i],])
+}
+rownames(m1) <- rownames(m)
+for ( i in 1:length(v)) {
+  rownames(m1)[i] <- rownames(m)[v[i]]
+}
+
+mosaicplot(m1, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
+
+rm(m1)
+rm(cols)
+rm(rows)
+rm(v)
+```
+
+NOTA ANÁLISIS: Tal y como se puede observar en la gráfica (se ha reordenado la información para que aparezcan las columnas juntas aquellas que tienen información común) de cara que sea mejor o más sencillo interpretar el gráfico. 
+
+Como primer vistazo se puede identificar:
+
+  a) Al igual que en 2011, H, D, J son ATCs con un comportamiento similar en relación a los valores 5424 y 7071. 
+  
+  b) Al igual que en 2011, A, M son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 5424.
+  
+  c) Al igual que en 2011 C, G son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 6144. Pero, la variable S parece que no coge significancia. Los ATCs B presentan un aumento de frecuencia en 2012 con respecto a 2011. 
+  
+  d) N, R son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 7071. 
+  
+  e) L, P, V son ATCs con pocos valores, en comparación al resto, y que no parece identificarse con ningún CRG-base de los tres en análisis. 
+  
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+NOTA ANALISIS: En este caso la inercial (0.0898) es menor a la "regla gorda" que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.  
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+NOTA ANÁLISIS: Tenemos un estadístico de 23.447,3 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 23.447 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+NOTA: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+NOTA ANÁLISIS: Se observa que la relación entre los grupos de ATCs que se podían visualizar en el gráfico de mosaico se ven representadas. 
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p, 2, "colprincipal")
+```
+
+NOTA ANÁLISIS: 

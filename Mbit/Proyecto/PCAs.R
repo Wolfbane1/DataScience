@@ -243,13 +243,24 @@ calculaBurbujaATC <- function(datos, matriz) {
   colnames(d)[1:4] <- c("Sexo", "Edad", "Anyo", "CRG_base")
   m <- matrix(nrow = 0,  ncol=3)
   
-  #Convertimos la matriz en una tabla para el gráfico.
+  #Calculamos el total por CRG
+#  if (tipo == "EXISTENCIA") {
+#    aux <- as.data.frame(cbind(d$CRG_base, apply(m_existeFamilia,1,sum)))
+#    total_crg <- sqldf("select V1 as CRG_base, sum(V2) as Total_CRG from aux group by V1")
+#  }
+#  else {
+    total_crg <- sqldf("SELECT CRG_base, sum(A) + sum(B) + sum(C) + sum(D) + sum(G) + sum(H) + sum(J) + sum(L) + sum(M) + sum(N) + sum(P) + sum(R) + sum(S) + sum(V) as Total_CRG from d group by CRG_base") 
+#  }
+  
+  #Convertimos la matriz en una tabla para el gráfico. Se calcula la suma por CRG del total de elementos para un ATC. 
   for (i in colnames(m_existeFamilia)) {
     df <- sqldf(paste("select CRG_base, '", i, "' as ATC, sum(", i, ") as Total from d group by CRG_base", sep=""))
+    df$Total <- floor(100*df$Total/total_crg$Total_CRG)
     m <- rbind(m, df)
   }
   rm(df)
   rm(d)
+  rm(total_crg)
   
   m$CRG_base <- factor(m$CRG_base)
   m$ATC <- factor(m$ATC)

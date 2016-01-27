@@ -1,0 +1,397 @@
+---
+title: "Datos Ficticios"
+author: "Francisco Javier Gutiérrez Expósito"
+date: "22 de enero de 2016"
+output: html_document
+---
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+origenMat <- file.path(getwd(), "data", "mat")
+
+#Librería que lee la estructura de un fichero de matlab.
+suppressPackageStartupMessages(library(R.matlab))
+suppressPackageStartupMessages(library(sqldf))
+suppressWarnings(suppressPackageStartupMessages(library("FactoMineR")))
+suppressWarnings(suppressPackageStartupMessages(library("factoextra")))
+suppressPackageStartupMessages(library("vcd"))
+suppressPackageStartupMessages(library("corrplot"))
+
+suppressWarnings(source("ac.R"))
+```
+
+##datos_orig
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- "datos_orig.mat"
+df <- LeeFichero(fichero)
+```
+
+###1.- Análisis Dos Dimensiones: X(rango) --> Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+suppressMessages(a <- sqldf("select x, z, count(*) as total from df group by x, z"))
+m <- getMatrizfromDF(a)
+EscribeTablaContingencia(m)
+labs <- EscribeDimensionalidadTabla(m)
+```
+
+####* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.a - Mosaico X vs Z</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Z")
+```
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p)
+```
+
+###Análisis Tres Dimensiones: X(rango), Y, Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos la tabla de Contingencia para el gráfico de Mosaico.
+m <- xtabs(~ df$x + df$z + df$y )
+p <- getMCA(df)
+```
+
+####* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico MAC - Mosaico X, Y, Z\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico X, Y, Z")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Explicación de la varianza</b>\n\n")
+fviz_screeplot(p, addlabels=TRUE) 
+
+cat("\n\n- Resumen del MCA\n\n")
+summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Análisis MCA</b>\n\n")
+
+cat("\n\n- Gráfico Normal\n\n")
+fviz_mca_var(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="rowprincipal", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE))
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+rm(labs)
+rm(a)
+```
+
+##2.- datos_ruidosos
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- "datos_ruidosos.mat"
+df <- LeeFichero(fichero)
+```
+
+###Análisis Dos Dimensiones: Variables: X(rango) --> Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+suppressMessages(a <- sqldf("select x, z, count(*) as total from df group by x, z"))
+m <- getMatrizfromDF(a)
+EscribeTablaContingencia(m)
+labs <- EscribeDimensionalidadTabla(m)
+```
+
+####* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.a - Mosaico X vs Z</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Z")
+```
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p)
+```
+
+###Análisis Tres Dimensiones: X(rango), Y, Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos la tabla de Contingencia para el gráfico de Mosaico.
+m <- xtabs(~ df$x + df$z + df$y )
+p <- getMCA(df)
+```
+
+####* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico MAC - Mosaico X, Y, Z\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico X, Y, Z")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Explicación de la varianza</b>\n\n")
+fviz_screeplot(p, addlabels=TRUE) 
+
+cat("\n\n- Resumen del MCA\n\n")
+summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Análisis MCA</b>\n\n")
+
+cat("\n\n- Gráfico Normal\n\n")
+fviz_mca_var(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="rowprincipal", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE))
+```
+
+##3.- datos_orig2
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- "datos_orig2.mat"
+df <- LeeFichero(fichero)
+```
+
+###Análisis Dos Dimensiones: Variables: X(rango) --> Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+suppressMessages(a <- sqldf("select x, z, count(*) as total from df group by x, z"))
+m <- getMatrizfromDF(a)
+EscribeTablaContingencia(m)
+labs <- EscribeDimensionalidadTabla(m)
+```
+
+####* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.a - Mosaico X vs Z</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Z")
+```
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p)
+```
+
+###Análisis Tres Dimensiones: X(rango), Y, Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos la tabla de Contingencia para el gráfico de Mosaico.
+m <- xtabs(~ df$x + df$z + df$y )
+p <- getMCA(df)
+```
+
+####* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico MAC - Mosaico X, Y, Z\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico X, Y, Z")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Explicación de la varianza</b>\n\n")
+fviz_screeplot(p, addlabels=TRUE) 
+
+cat("\n\n- Resumen del MCA\n\n")
+summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Análisis MCA</b>\n\n")
+
+cat("\n\n- Gráfico Normal\n\n")
+fviz_mca_var(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="rowprincipal", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE))
+```
+
+##4.- datos_ruidosos2
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- "datos_ruidosos2.mat"
+df <- LeeFichero(fichero)
+```
+
+###Análisis Dos Dimensiones: Variables: X(rango) --> Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+suppressMessages(a <- sqldf("select x, z, count(*) as total from df group by x, z"))
+m <- getMatrizfromDF(a)
+EscribeTablaContingencia(m)
+labs <- EscribeDimensionalidadTabla(m)
+```
+
+####* Gráfico de Mosaico
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Gráfico AC.a - Mosaico X vs Z</b>\n\n")
+mosaicplot(m, shade = TRUE, main = "Mosaico X vs Z")
+```
+
+####* Test de Independencia
+ 
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+p <- CA(m, graph = FALSE)
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestChi(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeContribucionDimension(m)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficoSimetrico(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeGraficosAsimetricos(p)
+```
+
+###Análisis Tres Dimensiones: X(rango), Y, Z
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Obtenemos la tabla de Contingencia para el gráfico de Mosaico.
+m <- xtabs(~ df$x + df$z + df$y )
+p <- getMCA(df)
+```
+
+####* Gráfico de Mosaico
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat(paste("\n\nGráfico MAC - Mosaico X, Y, Z\n\n", sep=""))
+mosaicplot(m, shade = TRUE, main = "Mosaico X, Y, Z")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+EscribeTestInercia(p)
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Explicación de la varianza</b>\n\n")
+fviz_screeplot(p, addlabels=TRUE) 
+
+cat("\n\n- Resumen del MCA\n\n")
+summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n<b>Análisis MCA</b>\n\n")
+
+cat("\n\n- Gráfico Normal\n\n")
+fviz_mca_var(p)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n --> Gráfico Asimétrico - RowPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="rowprincipal", arrows=c(TRUE, FALSE))
+
+  cat("\n\n --> Gráfico Asimétrico - ColPrincipal\n\n")
+fviz_mca_biplot(p, label="var", axes=c(1,2), mode="colprincipal", arrows=c(FALSE, TRUE))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+rm(labs)
+rm(a)
+```

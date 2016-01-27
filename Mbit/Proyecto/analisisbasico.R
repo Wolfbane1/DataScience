@@ -1,12 +1,14 @@
 
-suppressMessages(library("ggplot2"))  #Librería de gráficos "mínimos".
+suppressWarnings(suppressMessages(library("ggplot2")))  #Librería de gráficos "mínimos".
 suppressMessages(library("grid"))
 suppressMessages(library("lattice"))  #Librería de gráficos para la comparativa de variables.
 suppressMessages(library("sqldf"))    #Librería para tratar con SQL los objetos DataFrame.
 suppressMessages(library("R.matlab")) #Librería para escribir los .mat
 suppressMessages(library("reshape2"))
 suppressMessages(library("crayon"))   #Librería para emitir textos de color. 
-  
+library(nortest)                      #Librería para usar el test de Lillieforst.
+library(MASS)                         #Librería para usar el Test de Wilcoxon.
+
 N <- 8
 
 ####################################
@@ -358,18 +360,65 @@ obtieneRangoEdad <- function(tipo, csv) {
 }
 
 ####################################
+## Función: modificaDatos --> Punto centralizado en el código para que se puedan hacer transformaciones
+#                             sobre los datos, como por ejemplo, el ajuste en la edad del año 2012
+#                             que en los ficheros .mat recibidos venían con un dato menos.
+#
+#
+modificaDatos <- function(csv, ficheroFiltro) {
+  #FILTRO de datos.
+  # Se tienen que filtrar los IDs que vienen en el fichero de Filtro porque son pacientes asociados a 
+  # centros de salud no vinculados al HUF. Eso significa que no tenemos los ATCs de estos pacientes y
+  # sin embargo el CRG puede ser muy variado, por lo que podrían "falsear" los resultados. 
+  #Guardamos una copia de lo leído para "revisar"
+  filtro <- procesaFicheroFiltro(ficheroFiltro)
+  csv <- csv[!csv$Id %in% filtro$Id, ]
+  
+  #AJUSTES para 2011. 
+  # No se han detectado ajustes específicos a realizar en 2011.
+  
+  #AJUSTES para 2012.
+  # EDAD --> Todas las edades viene con un año menos por problemas en la generación. Se suma 1.
+    csv[csv$Anyo == 2012, "Edad"] <- csv[csv$Anyo == 2012, "Edad"] + 1
+  
+  # PACIENTE 16158224 --> Viene con Edad -17. Nació en 1929 por lo que su edad real en 2012 es 83 años.
+    csv[csv$Id == 16158224 & csv$Anyo == 2012, "Edad"] <- 83
+  
+    return(csv)
+}
+
+####################################
+## Función: procesaFicheroFiltro --> Lee los datos del fichero con los IDs a filtrar.
+#  Parámetros: ficheroFiltro --> Path al fichero que hay que leer.
+#
+procesaFicheroFiltro <- function(ficheroFiltro) {
+  filtro <- read.csv(ficheroFiltro, sep=";")
+  filtro <- as.data.frame(filtro[,1])
+  colnames(filtro) <- c("Id")
+  
+  return (filtro)
+}
+
+####################################
 ## Función: procesaCSV --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
 #                          lee el fichero y genera las columnas necesarias.
+#  Parámetros: 
+#     ficheros -> Vector de nombres de ficheros a tratar. La posición de los ficheros es:
+#        posición 1 --> Fichero CSV a leer con todos los datos. 
+#        posicion 2 --> Fichero CSV a leer con los Ids de los pacientes que no se deben tratar. 
 #
-#
-procesaCSV <- function(ficheroDestino) {
+procesaCSV <- function(ficheros) {
+  
+  ficheroDestino <- ficheros[1]
+  ficheroFiltro <- ficheros[2]
+  
   #Códigos ATC para diabéticos.
   ATCsDiabeticos <- c("A10AB","A10AC","A10AD","A10AE","A10AF","A10BA","A10BB","A10BC","A10BD","A10BF","A10BG","A10BH","A10BX","A10XA")
   cat(paste("Medicamentos que se consideran como ATCs para Diabéticos:"), imprime(ATCsDiabeticos), "\n\n", sep="")
   
-  #Lee el fichero de entrada.
+  #Lee el fichero de entrada. Se invoca a la función que aplica transformaciones sobre los CSV leídos.
   #csv <- read.csv( ficheroDestino, nrows=100 )
-  csv <- read.csv( ficheroDestino)
+  csv <- modificaDatos(read.csv( ficheroDestino), ficheroFiltro)
   
   #PUNTO 1: Se añaden variables "factor".
   #Variables categóricas: Se generan las variables categóricas a partir de los daots del fichero:
@@ -655,3 +704,19 @@ imprime <- function(v) {
   return (cad)
 }
 
+## Función: cuentaCRGAño
+#  Agrupa el número de pacientes por CRG en cada año. Se añade el CRG que falta para 2012 para que cuando se 
+#  muestren comparativamente por año veamos siempre la misma proporción. 
+#  
+#
+cuentaCRGAño <- function(csv) {
+  c <- sqldf("select Anyo, CRG, count(*) as total from csv group by Anyo, CRG")
+  
+  #Se añade el registro que falta.
+  df <- data.frame(c(2012), c(9010), c(0))
+  colnames(df) <- colnames(c)
+  c <- rbind(c, df)
+  
+  #Se devuelve la cuenta.
+  return(c)
+}

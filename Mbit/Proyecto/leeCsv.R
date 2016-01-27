@@ -28,6 +28,7 @@ destinoCSV <- file.path(getwd(), "data", "csv")
 ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
 
 ######################################################################
 #### EJECUCION SOLO PARA PROCESAR .MAT
@@ -53,15 +54,17 @@ rm(procesaFicheroMat)
 
 source("analisisbasico.R")
 
-csv <- procesaCSV(ficheroDestino)
+ficheros <- c(ficheroDestino, ficheroFiltro)
+csv <- procesaCSV(ficheros)
 
+#Sacar datos del 2011
+#estadisticos(2011,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
 
-
-
-
-
+#Sacar datos del 2012
+#estadisticos(2012,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
 
 #Liberamos sobre todo para liberar el espacio del environment dentro del RStudio.
+rm(ficheros)
 rm(ficheroDestino)
 rm(destinoCSV)
 rm(origenData)
@@ -69,23 +72,15 @@ rm(origenMat)
 rm(ficheroTomanA10Destino)
 rm(ficheroNoTomanA10Destino)
 
-rm(cuentaMedicamentos)
+#d <- csv
 
-#Sacar datos del 2011
-estadisticos(2011,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
-
-#Sacar datos del 2012
-estadisticos(2012,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
-
-d <- csv
-
-estadisticosId(d$Id)
-estadisticosSexo(d$Sexo)
-estadisticosEdad(d)
-estadisticosNivelCRG(d$nivel)
-revisaDispensacionATCsDiabeticos(d, ficheroTomanA10Destino, ficheroNoTomanA10Destino)
-ejecutaComparativa(d)
-ejecutaRangoEdad(d)
+#estadisticosId(d$Id)
+#estadisticosSexo(d$Sexo)
+#estadisticosEdad(d)
+#estadisticosNivelCRG(d$nivel)
+#revisaDispensacionATCsDiabeticos(d, ficheroTomanA10Destino, ficheroNoTomanA10Destino)
+#ejecutaComparativa(d)
+#ejecutaRangoEdad(d)
 
 rm(estadisticosATCsVacios)
 rm(estadisticosEdad)
@@ -93,9 +88,9 @@ rm(estadisticosId)
 rm(estadisticosNivelCRG)
 rm(estadisticosPosATCsVacios)
 rm(estadisticosSexo)
+rm(modificaDatos)
 rm(procesaCSV)
-
-
+rm(procesaFicheroFiltro)
 rm(obtieneRangoEdad)
 rm(ejecutaComparativa)
 rm(ejecutaRangoEdad)
@@ -103,47 +98,156 @@ rm(ejecutaComparativaRangoEdad)
 rm(estadisticos)
 rm(revisaDispensacionATCsDiabeticos)
 rm(imprime)
+rm(cuentaMedicamentos)
+rm(cuentaCRGAño)
+
+
+d11 <- subset(csv, csv$Anyo == 2011)
+d12 <- subset(csv, csv$Anyo == 2012)
+
+#Vemos los pacientes que están en 2011 y en 2012.
+Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+n <- nrow(Si_2011_Si_2012)
+Si_2011_Si_2012 <- cbind(Si_2011_Si_2012, rep(0, n), rep(0, n), rep(0, n), rep(0, n))
+colnames(Si_2011_Si_2012) <- c("Id", "Sexo_11", "Edad_11", "CRG_11", "Id_12", "Sexo_12", "Edad_12", "CRG_12")
+
+for (i in 1:nrow(Si_2011_Si_2012) ) {
+  Si_2011_Si_2012[i, c("Id_12", "Sexo_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Sexo", "Edad", "CRG")]
+}
+
+
+#Gráfica Distribución por Año.
+Anyo <- factor(csv$Anyo)
+cuentas <- suppressMessages(sqldf("select Anyo, count(*) as total from csv group by Anyo"))
+plot(Anyo, xlab="Año", ylab="Número de pacientes", ylim=c(0, 12000), col=colorAnyo)
+title(main="Gráfica 1.- Distribución datos por Año", cex.main=0.7)
+text(1, 11500, labels=c(cuentas[1,2]), adj=0.5, font=4, cex=0.9)
+text(2, 11500, labels=c(cuentas[2,2]), adj=0.5, font=4, cex=0.9)
+abline(h=n, lwd=3, col="red")
+text(1, n+300, paste(n, " pacientes coincidentes entre ambos años"), col="red")
+
+#Gráfica Distribución por CRG de nuevos pacientes. 
+No_2011_Si_2012 <- d12[!d12$Id %in% d11$Id, c("Id","Genero", "Edad", "CRG")]
+No_2011_Si_2012$Genero <- factor(No_2011_Si_2012$Genero)
+plot(table(No_2011_Si_2012$CRG), 
+     xlab = "CRG-base", ylab="Número de Pacientes", 
+     cex.axis = 0.7, col=colorCRG, type="l")
+title(main=paste("Distribución por CRG de los 'nuevos' pacientes en 2012.",
+                 "Total pacientes nuevos: ", nrow(No_2011_Si_2012)), cex.main=0.7)
+
+Si_2011_No_2012 <- d11[!d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+Si_2011_No_2012$Genero <- factor(Si_2011_No_2012$Genero)
+barplot(table(Si_2011_No_2012$CRG), 
+        xlab = "CRG-base", ylab="Número de Pacientes", 
+        cex.axis = 0.7, col=colorCRG)
+title(main=paste("Distribución por CRG de los pacientes que desaparecen en 2012.",
+                 "Total pacientes que no están: ", nrow(Si_2011_No_2012)), cex.main=0.7)
+
+rm(i)
+rm(d11)
+rm(d12)
+
+
+#Sacamos las gráficas de distribución por Edad, coloreando el Género.  
+cuentas <- sqldf("select Anyo, Edad, Sexo, count(*) as total from csv group by Anyo, Edad, Sexo")
+
+colorGenero <- c("red", "blue")
+par(mfrow=c(2,1), mar=c(3,3,2,2))
+for (anyo in unique(cuentas$Anyo)) {
+  d <- subset(cuentas, cuentas$Anyo==anyo)
+  plot(subset(d, Sexo==1)$Edad, subset(d, Sexo==1)$total, 
+       xlab = "Edad", ylab="Número de Pacientes", xaxt="n",
+       cex.axis = 0.7, type="l", col=colorGenero[1])
+  lines(subset(d, Sexo==2)$Edad, subset(d, Sexo==2)$total, col=colorGenero[2])
+  title(main=paste("Distribución de Edad en ", anyo, sep=""), cex.main=0.7)
+  axis(1,  at = unique(d$Edad), labels=unique(d$Edad), cex.axis=0.7)
+  #legend("topright", legend = c("Género 1", "Género 2"), fill=colorGenero)
+  i<- i + 1
+}
+
+kt <- ks.test(d11$Edad, "pnorm", mean=mean(d11$Edad), sd=sd(d11$Edad)) 
+p <- rnorm(1000)
+kt <- ks.test(p, "pnorm") 
+summary(kt)
+kt$p.value
+kt$statistic
+
+kt <- lillie.test(d11$Edad)
+kt$statistic
+kt$p.value
+
+Edad_Hombre <- subset(d11$Edad, d11$Genero==1)
+Edad_Mujer <- subset(d11$Edad, d11$Genero==2)
+
+kt <- wilcox.test(Edad_Mujer, Edad_Hombre)
+kt$statistic
+kt$p.value
 
 for (anyo in unique(csv$Anyo)) {
-  cat(paste("##", anyo, sep = ""))
+  Edad <- subset(csv$Edad, Anyo == anyo)
   
-  d <- csv[csv$Anyo == anyo,]
-
-  #Estadisticos básicos
-  cat("###Edad")
-  estadisticosEdad(d)
+  suppressWarnings(kt <- ks.test(Edad, "pnorm"))
+  cat(paste("\n\n--> Test de Kolmogorov-Smirnov --> Año: ", anyo, 
+            "; Estadístico: ", kt$statistic, "; p-value: ", kt$p.value, sep=""))
+  
+  kt <- lillie.test(Edad)
+  cat(paste("\n\n--> Test de Lillieforst --> Año: ", anyo, 
+            "; Estadístico: ", kt$statistic, "; p-value: ", kt$p.value, sep=""))
 }
 
 
-
-
-p <- qplot(d$Edad, ylab = "Número Pacientes", main = "Distribución de Pacientes por Edad")
-ggplotly(p)
-
-qplot(table(d$Edad, d$Genero), colours=c("red", "blue"))
-boxplot(d$Edad)
-
-summary(d$Edad)
-
-  cat("###Sexo")
-  estadisticosSexo(d$Sexo)
-  
-  cat("###Id")
-  estadisticosId(d$Id)
-  
-  cat("###Nivel CRG-base")
-  estadisticosNivelCRG(d$nivel)
-  
-  #estadisticos(anyo,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
-  rm(d)
+for (anyo in unique(csv$Anyo)) {
+  for (i in unique(csv$nivel)) {
+    mu1 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 1)
+    mu2 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 2)
+    if (length(mu1) > 4 & length(mu2) > 4 ) {
+      prueba <- wilcox.test(mu1, mu2)
+      cat(red(paste("\n\n\t\tCRG-base = ", i, ", p-Value: ", round(prueba$p.value, 5), 
+                    ", Género 1: ", length(mu1), ", Género 2: ", length(mu2), sep="")))
+    }
+  }
 }
+
+rm(anyo)
+for (anyo in unique(csv$Anyo)) {
+  Edad <- subset(csv$Edad, Anyo == anyo)
+  cat(paste("\n\nAño:", anyo, "; Edad:", length(Edad), "\n\n", sep=""))
+  
+  #suppressWarnings(kt <- ks.test(Edad, "pnorm"))
+  #cat(paste("\n\n--> Test de Kolmogorov-Smirnov --> Año: ", anyo, 
+  #          "; Estadístico: ", kt$statistic, "; p-value: ", kt$p.value, sep=""))
+  
+  #kt <- lillie.test(Edad)
+  #cat(paste("\n\n--> Test de Lillieforst --> Año: ", anyo, 
+  #          "; Estadístico: ", kt$statistic, "; p-value: ", kt$p.value, sep=""))
+}
+
+for (anyo in unique(csv$Anyo)) {
+  cat(paste("\n\n Año ", anyo, "\n\n", sep=""))
+  csv2 <- subset(csv, csv$Anyo == anyo)
+  g <- ggplot(csv2, aes(x=nivel, y=Edad, fill=Genero)) + geom_boxplot(notch=TRUE) + 
+    scale_fill_manual(values=colorGenero) +
+    theme(axis.text.x = element_text(size = 7, colour = colorCRG)) + 
+    theme(title = element_text(size = 7, colour = "black")) + 
+    labs(x="CRG-base", y="Edad",
+         title=paste("Distribución de pacientes según CRG-base y Sexo en ", anyo, sep=""))
+  suppressMessages(print(g))
+}
+rm(anyo)
+rm(csv2)
+rm(g)
+
+df <- csv[csv$Anyo == 2012 & csv$totalATCDiabeticos == 0, c("Id", "Anyo")]
+write.csv("Id_Sin_ATC_Diabeticos.csv", sep=";")
+
+df2 <- readMat("/Users/zzddfge/Desktop/Compartida/Proyecto_Master/data/csv/noTomanA10.mat")
+
+revisaDispensacionATCsDiabeticos(csv, ficheroTomanA10Destino, ficheroNoTomanA10Destino)
 
 #TODO en esta parte:
 #  --> relación de existencia / probabilidad de ocurrencia.
 #  --> hacer zoom sobre los grupos con más número: 6144 y 5424
-#  --> búsqueda de DBSCAN para R. 
 #  --> cálculo del PCA. Cuando se tengan los PCAs, seguramente haya que evaluar rango de edad otra vez.
-#  --> análisis de correspondencia. 
 #  --> revisar si hay significancia estadística en la diferencia de grupos hombres y mujeres.
 
 #ALTERN -1 ) Para cada CRG-base, obtener el número de ocurrencias de cada familia de ATC por 
@@ -188,7 +292,6 @@ rm(obtieneExistencia)
 rm(reduceMatrizATC)
 rm(standMatrix)
 rm(standVector)
-rm(s)
 rm(calculaBurbujaATC)
 rm(calculaPCA_nivel1)
 rm(calculaPCA_nivel2)
