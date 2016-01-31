@@ -154,6 +154,7 @@ png(filename = "plot6.png",
 plot(pB$year, pB$Emissions, type="l", ylim = ylim, xlim=c(1998, 2009),
      xaxt="n", xlab = "Year", ylab="Tons", col="red")
 points(pB$year, pB$Emissions, pch=20, col="red")
+legend("center", title="Countys", ncol=2, col=c("red", "blue"), pch=20, legend=c("Baltimore", "Los Angeles"))
 title("Comparation of Emissions in Baltimore and LA from all Motor Vehicle", cex.main = 0.8)
 axis(1, at=unique(p$year), labels=unique(p$year))
 par(new = TRUE)
