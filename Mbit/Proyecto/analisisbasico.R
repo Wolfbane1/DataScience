@@ -459,7 +459,7 @@ procesaCSV <- function(ficheros) {
   #warning(paste("Warning:", length(av), " familias que no tienen dispensación:"))
   #warning(paste(av, "\n"))
   
-  csv <- csv[,-c(atcsVacios)]
+  #csv <- csv[,-c(atcsVacios)]
   
   #Eliminación de las variables creadas
   rm(av)

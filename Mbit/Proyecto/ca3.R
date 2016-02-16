@@ -34,7 +34,7 @@ chisq
 #Análisis de Correspondencia.
 CA(m, ncp = 5, graph = TRUE)
 
-p <- CA(m, ncp = 2, graph = FALSE)
+p <- CA(m, ncp = 5, graph = FALSE)
 p$col$coord
 p$row$coord
 xmin = min(p$row$coord[,1], p$col$coord[,1])[1] * 1.1

@@ -267,3 +267,6 @@ calculaBurbujaATC <- function(datos, matriz) {
   return(m)
 }
 
+convierteExistencia <- function(x) {
+  return (ifelse(x>0, 1, 0))
+}

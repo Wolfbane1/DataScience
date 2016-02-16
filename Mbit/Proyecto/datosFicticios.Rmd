@@ -263,8 +263,8 @@ a <- min(numb.dim.cols, numb.dim.rows)
 p$col$coord <- cbind(p$col$coord, rep(0, 2))
 xmin = range(p$row$coord[1], p$col$coord[1])[1] * 1.1
 plot(p$row$coord, c(0,0,0), type = "p", pch = 16, col="blue",
-     xlim=c(-0.005, 0.005),
-     ylim=c(-0.4,0.4),
+#     xlim=c(-0.005, 0.005),
+#     ylim=c(-0.4,0.4),
      xlab="Dimensión 1", ylab="",
      main = "X[rango] vs Y", cex.main=0.7
 )

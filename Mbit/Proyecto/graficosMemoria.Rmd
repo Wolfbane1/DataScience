@@ -9,6 +9,9 @@ cat(paste("date:", date()))
 ```
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
 origenData <- file.path(getwd(), "data")
 origenMat <- file.path(getwd(), "data", "mat")
 destinoCSV <- file.path(getwd(), "data", "csv")
@@ -32,12 +35,13 @@ colorGenero <- c("slateblue3", "snow4")
 #              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", #"saddlebrown", 
 #              "pink", "yellow", "olivedrab", "navajowhite")
 colorCRG <- c("thistle", 
-             "green", "lemonchiffon", "lemonchiffon", "lemonchiffon", "red1", "lemonchiffon", "red2",
+             "green", "yellow4", "yellow4", "yellow4", "red1", "yellow4", "red2",
              "slateblue", "red3",       
-              "yellow", "green1", "green2", "green3", "yellow", "yellow", "yellow", "red4", 
+              "yellow2", "green1", "green2", "green3", "yellow2", "yellow2", "yellow2", "red4", 
               "blue", "darkblue", "darkgrey")
 
 source("analisisbasico.R")
+source("PCAs.R")
 
 #procesamos el CSV final.
 ficheros <- c(ficheroDestino, ficheroFiltro)
@@ -394,7 +398,7 @@ TODO: Chequear con el hospital.
 
 ```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
   #Gráfico 7 - CRG comparando los que toman medicamentos de Diabeticos vs el Total.
-  cat("\n\n<b>Gráfica 7.1 - Porcentaje de distribución del CRG-base[5 dígitos] por Edad</b>\n\n")
+  cat("\n\n<b>Gráfica 7.1 - Probabilidad de un CRG-base[5 dígitos] dada una Edad</b>\n\n")
   for (anyo in unique(csv$Anyo)) {
     cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
     dx <- subset(csv, csv$Anyo == anyo)
@@ -428,13 +432,13 @@ TODO: Chequear con el hospital.
       scale_fill_manual("CRG-base", values=colorCRG) +
       scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
       theme(axis.text.x = element_text(size = 8, 
-                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+                  colour = c("black", "red", "blue", "blue", "green", "blue", "blue", "red", "black"))) + 
       theme(title = element_text(size = 8, colour = "black")) + 
       theme(legend.text = element_text(size = 6)) + 
       theme(legend.key.height = unit (0.4, "cm")) + 
 #      annotate("text", x = as.integer(rownames(df_crg[df_crg$Edad == pos1,])[1])
 #             , y = 0.02, colour="red", size=3, label = " <---- Percentiles 25% y 75% ----> ") + 
-    labs(y="%", title="Porcentaje de distribución del CRG por Edad [5 dígitos]")
+    labs(y="%", title="Probabilidad de un CRG-base[5 dígitos] dada una Edad")
     print(g)
   }  
   rm(anyo)
@@ -453,7 +457,7 @@ TODO: Chequear con el hospital.
   rm(n5)
 ```
 
-NOTA: Nótese que las etiquetas del eje X que están en rojo corresponden a los bigotes del boxplot que delimitan los outliers, y las etiquetas en azul corresponden al Quartil 1 (25%) y al Quartil 3 (75%) de la población respectivamente.
+NOTA: Nótese que las etiquetas del eje X que están en rojo corresponden a los bigotes del boxplot que delimitan los outliers, y las etiquetas en azul corresponden al Quartil 1 (25%) y al Quartil 3 (75%) de la población respectivamente. La etiqueta de color verde corresponde a la mediana (50%).
 
 NOTA ANÁLISIS 2011: Para 2011, y en base de los colores establecidos previamente, se puede observar lo siguiente:
   a) CRG_base [5424]: Conforme aumenta la edad, el número de pacientes disminuye. Es decir, conforme aumenta la edad, los pacientes van evolucionando a otros códigos CRG que presentan comorbilidades.
@@ -470,7 +474,7 @@ NOTA ANÁLISIS 2012: Para 2012 se puede observar como la proporción de paciente
 
 
 ```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
-  cat("\n\n<b>Gráfica 7.1.b - Porcentaje de distribución del CRG-base[5 dígitos] por Edad para pacientes comunes</b>\n\n")
+  cat("\n\n<b>Gráfica 7.1.b - Probabilidad del CRG-base[5 dígitos] dada una Edad (pacientes comunes)</b>\n\n")
   for (anyo in unique(csv$Anyo)) {
     cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
     dx <- subset(csv, csv$Anyo == anyo)
@@ -507,13 +511,13 @@ NOTA ANÁLISIS 2012: Para 2012 se puede observar como la proporción de paciente
       scale_fill_manual("CRG-base", values=colorCRG) +
       scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
       theme(axis.text.x = element_text(size = 8, 
-                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+                  colour = c("black", "red", "blue", "blue", "green", "blue", "blue", "red", "black"))) + 
       theme(title = element_text(size = 8, colour = "black")) + 
       theme(legend.text = element_text(size = 6)) + 
       theme(legend.key.height = unit (0.4, "cm")) + 
 #      annotate("text", x = as.integer(rownames(df_crg[df_crg$Edad == pos1,])[1])
 #             , y = 0.02, colour="red", size=3, label = " <---- Percentiles 25% y 75% ----> ") + 
-    labs(y="%", title="Porcentaje de distribución del CRG por Edad [5 dígitos]")
+    labs(y="%", title="Probabilidad de un CRG-base[5 dígitos] dada una Edad (pacientes comunes)")
     print(g)
   }  
   rm(anyo)
@@ -598,6 +602,67 @@ En la evolución de 2011 a 2012 se puede obsercar como los grupos 70xx aumentan 
 ```
 
 NOTA ANÁLISIS: No sé como lo veis vosotras, pero creo que es más claro el gráfico 7.1, donde están agrupados por los colores :-). 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n<b>Gráfica 7.3 - Probabilidad de la Edad[rango] dado un CRG</b>\n\n")
+  colorCRG_3 <- c("thistle","green", "lemonchiffon", "lemonchiffon", "red1", "lemonchiffon", "green1",
+                  "red2", "blue", "grey")
+  
+  for (anyo in unique(csv$Anyo)) {
+    cat(paste("\n\n<b>Año", anyo, "</b>\n\n"))
+    dx <- subset(csv, csv$Anyo == anyo)
+    
+    #Añadimos el código de 3
+    dx$CRG <- substr(dx$CRG, 1, 3)
+    
+    #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
+    df <- as.data.frame(sqldf("select Edad, count(*) as Total from dx group by Edad"))
+    df_crg <- as.data.frame(sqldf("select Edad, CRG, count(*) as Total from dx group by Edad, CRG"))
+    df_crg <- cbind(df_crg, rep(1.01, nrow(df_crg)))
+    df_crg$CRG <- factor(df_crg$CRG)
+    colnames(df_crg)[4] <- "Total %"
+
+    #Calculamos el %
+    for (i in 1:nrow(df_crg)) {
+      df_crg[i, "Total %"] <- as.numeric(100*round(df_crg[i, "Total"] / df[df$Edad == df_crg$Edad[i], "Total"], 4))
+    }
+
+    #Calculamos las gráficos que vamos a poner en el eje de Edad. 
+    pos1 <- as.integer(floor(quantile(dx$Edad, 0.25)))
+    pos3 <- as.integer(floor(quantile(dx$Edad, 0.5)))
+    pos5 <- as.integer(ceiling(quantile(dx$Edad, 0.75)))
+    pos2 = as.integer((pos3-pos1)/2+pos1)
+    pos4 = as.integer((pos5-pos3)/2+pos3)
+    p1_iqr <- pos1 - IQR(dx$Edad)
+    p5_iqr <- pos5 + IQR(dx$Edad)
+    n1 <- as.integer(p1_iqr/2)
+    n5 <- as.integer((max(dx$Edad) - p5_iqr)/2)+ p5_iqr
+    
+    #Pintamos el gráfico.
+    g <- ggplot(df_crg,  
+                aes(x=Edad, y=`Total %`)) + geom_bar(stat="identity", aes(fill=df_crg$CRG)) + 
+      scale_fill_manual("CRG-base[3]", values=colorCRG_3) +
+      scale_x_continuous(name = "Edad", breaks=c(5, 15, pos1, pos2, pos3, pos4, pos5, 85, 95)) +
+      scale_x_continuous(name = "Edad", breaks=c(n1, p1_iqr, pos1, pos2, pos3, pos4, pos5, p5_iqr, n5)) +
+      theme(axis.text.x = element_text(size = 8, 
+                  colour = c("black", "red", "blue", "blue", "blue", "blue", "blue", "red", "black"))) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+     labs(y="%", title="Porcentaje de distribución del CRG por Edad [3 dígitos]")
+    print(g)
+  }  
+  rm(anyo)
+  rm(dx)
+  rm(df)
+  rm(df_crg)
+  rm(g)
+  rm(pos1)
+  rm(pos2)
+  rm(pos3)
+  rm(pos4)
+  rm(pos5)
+```
 
 #Revisión de ATCs
 
@@ -709,86 +774,338 @@ NOTA ANÁLISIS 2011:
   
   c) Matriz de Suma de Dispensaciones: Los grupos A y C, seguido por los grupos B y N son los que mayor proporción de dispensaciones tienen. 
 
+En resumen:
+  - En existencia parece que hay dispensaciones de todos los ATC aunque hay tres o cuatro que tienen mucha menor proporción de uso. 
+  - En suma de disposición parece que la mayoría se centran en tres ATCs principales (A, C, N) y otros tres secundarios (B, J, R). Sale algo parecido a lo que habíamos visto en el primer análisis de correspondencia. 
+  - Parece que hay relación entre el número de disposiciones y el número de medicamentos distintos que se toman porque en general parece que se mantienen las proporciones. Salvo en los ATC J, M, R que parece que no hay muchas dispensaciones pero hay mayor proporción de número de medicamentos distintos.
+
 NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la distribución de la proporción de existencia con respecto a 2011 para ninguna de las matrices.
 
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+m <- matrix(nrow=0, ncol=4)
+  
 #Iteramos por año.
 for (anyo in unique(csv$Anyo)) {
   #Generamos título Nivel 2
-  cat(paste("##Año ", anyo, "\n\n"))
+  cat(paste("\n\n##Año ", anyo, "\n\n"))
   
   #Generamos el conjunto de datos.
-  dx <- eliminaATCsVacios(csv, anyo, 7:(ncol(csv)-N))
+  #dx <- eliminaATCsVacios(csv, anyo, 7:(ncol(csv)-N))
   #Generamos el gráfico para cada CRG.
   cat("###Generacíon de gráficas individuales por CRG-base\n\n")
   
-    #Preparamos los datos para el año en curso.
-    dx <- subset(csv, csv$Anyo == anyo)
-    pacientes <- as.data.frame(cbind(dx$Id, dx$CRG, 
-                                  dx$totalATCTodos, dx$totalATCDiabeticos, dx$totalATCOtros,
-                                  rep(1.01, length(dx$Id)), rep(1.01, length(dx$Id)), 
-                                  rep(1.01, length(dx$Id))))
-    colnames(pacientes) <- c("Id", "CRG", "TotalATCs", "TotalATCDiab", "TotalATCOtros", 
-                             "%TotalATc", "%TotalATCDiab", "%TotalATCOtros")
+  atc <- subset(csv, csv$Anyo == anyo)
+  atc <- atc[,c(6,7:(ncol(atc) - N))]
+  i <- 1
+  par(mfrow=c(2,1), mar=c(3,2,3,2))
+  for (crg in unique(atc$CRG)) {
+    cat(paste("\n\nGráfica ATC.CRG.", i, ".", anyo, ": ", crg, 
+                " - Distribución de la Proporción de la toma de ATCs",
+                ", Número de pacientes: ", length(atc[atc$CRG==crg, "CRG"]), "\n\n", sep=""))
 
-    #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
-    df <- as.data.frame(sqldf("select CRG, sum(totalATCTodos) as TotalATCs, 
-                              sum(totalATCDiabeticos) as TotalATCDiab, 
-                              sum(totalATCOtros) as TotalATCOtros
-                              from dx group by CRG"))
- 
-    #Calculamos el %
-    for (i in 1:nrow(pacientes)) {
-      pacientes[i, "%TotalATc"] <- as.numeric(round(pacientes[i, "TotalATCs"] / df[df$CRG == pacientes$CRG[i], "TotalATCs"], 4))
-      pacientes[i, "%TotalATCDiab"] <- as.numeric(round(pacientes[i, "TotalATCDiab"] / df[df$CRG == pacientes$CRG[i], "TotalATCDiab"], 4))
-      pacientes[i, "%TotalATCOtros"] <- as.numeric(round(pacientes[i, "TotalATCOtros"] / df[df$CRG == pacientes$CRG[i], "TotalATCOtros"], 4))
-    }
-    pacientes$CRG <- factor(pacientes$CRG)
-    i <- 1 #variable para pintar el CRG del color apropiado. 
-    par(mfrow=c(1,2))
+    #Filtramos por el ATC
+    atc_crg <- subset(atc, atc$CRG == crg)
+    atc_crg <- atc_crg[,-1]
     
-    for (crg in unique(dx$CRG)) {
-      cat(paste("\n\nGráfica ATC.CRG.", i, ".", anyo, ": ", crg, 
-                " - Distribución de Pacientes por toma de ATCs",
-                ", Número de pacientes: ", length(pacientes[pacientes$CRG==crg, "CRG"]), "\n\n", sep=""))
-      
+    #Sumamos el total de las dispensaciones.
+    atc_col <- 100*apply(atc_crg, 2, sum)/sum(atc_crg)
+    #p <- atc_col[atc_col >= quantile(atc_col, 0.96)]
+    p <- atc_col
+    #n <- names(atc_col[atc_col >= quantile(atc_col, 0.96)])
+    n <- names(atc_col)
+    a <- rep(anyo, length(p))
+    c <- rep(crg, length(p))
+    m <- rbind(m, cbind(a, c, n, p))
+    rownames(m) <- c()
+
+    label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+    pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+    plot(atc_col, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC", sep=""), 
+            cex.main=0.65)
+
+    plot(atc_col[atc_col >= quantile(atc_col, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col[atc_col >= quantile(atc_col, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col[atc_col >= quantile(atc_col, 0.96)])), 
+           labels=names(atc_col[atc_col >= quantile(atc_col, 0.96)]), cex.axis = 0.5, las=3)
+    title(main=paste("ZOOM: ATCs con mayor Ocurrencia", sep=""), 
+            cex.main=0.65)
+    abline(h=3.5, col="red")
+    abline(h=7, col="red")
+
+    i <- i + 1
+  }
+}
+  
+rm(atc_crg)
+rm(atc_col)
+rm(atc)
+rm(i)
+#rm(dx)
+rm(anyo)
+rm(label)
+rm(pos)
+rm(c)
+rm(p)
+rm(n)
+rm(a)
+  
+#Una vez que se ha finalizado la ejecución para los años, obtenemos los valores mayores.
+m <- as.data.frame(m)
+colnames(m) <- c("Anyo", "CRG", "Names", "Prob")
+m$Anyo <- as.factor(m$Anyo)
+m$CRG <- as.factor(m$CRG)
+m$Prob <- round(as.numeric(as.character(m$Prob)), 4)
+atc <- subset(m, m$CRG %in% c(5424, 6144, 7071) & m$Prob >= 3.0 )  
+
+#Ahora hay que concatenar las columnas que no estén en los otros CRGs y que estén en el previo.
+u <- unique(atc$Names)
+atc_f <- subset(m, m$CRG %in% c(5424, 6144, 7071) & m$Names %in% u)
+
+t <- subset(atc_f, atc_f$Anyo==2011)
+#t$CRG <- as.factor(as.character(t$CRG))
+t$CRG <- as.integer(as.character(t$CRG))
+t$Prob <- as.numeric(t$Prob)
+
+par(mfrow=c(1,2), mar=c(3,2,3,2))
+plot(t$CRG, t$Prob, type ="p", xlim=c(5000, 7500))
+title(main="Año 2011 - Evolución de ATCs por CRG-base", cex.main=0.7)
+segments(t[t$CRG==5424,"CRG"], t[t$CRG==5424, "Prob"], t[t$CRG==6144,"CRG"], t[t$CRG==6144,"Prob"])
+segments(t[t$CRG==6144,"CRG"], t[t$CRG==6144, "Prob"], t[t$CRG==7071,"CRG"], t[t$CRG==7071,"Prob"])
+text(rep(5200,length(t[t$CRG==5424, "Prob"])), t[t$CRG==5424, "Prob"], t[t$CRG==5424, "Names"],cex=0.7 )
+text(rep(7300,length(t[t$CRG==7071, "Prob"])), t[t$CRG==7071, "Prob"], t[t$CRG==7071, "Names"],cex=0.7 )
+
+t <- subset(atc_f, atc_f$Anyo==2012)
+#t$CRG <- as.factor(as.character(t$CRG))
+t$CRG <- as.integer(as.character(t$CRG))
+t$Prob <- as.numeric(t$Prob)
+
+plot(t$CRG, t$Prob, type ="p", xlim=c(5000, 7500))
+title(main="Año 2012 - Evolución de ATCs por CRG-base", cex.main=0.7)
+segments(t[t$CRG==5424,"CRG"], t[t$CRG==5424, "Prob"], t[t$CRG==6144,"CRG"], t[t$CRG==6144,"Prob"])
+segments(t[t$CRG==6144,"CRG"], t[t$CRG==6144, "Prob"], t[t$CRG==7071,"CRG"], t[t$CRG==7071,"Prob"])
+text(rep(5200,length(t[t$CRG==5424, "Prob"])), t[t$CRG==5424, "Prob"], t[t$CRG==5424, "Names"],cex=0.7 )
+text(rep(7300,length(t[t$CRG==7071, "Prob"])), t[t$CRG==7071, "Prob"], t[t$CRG==7071, "Names"],cex=0.7 )
+
+#plot(t$CRG, t$Prob)
+#
+#   g <- ggplot(t, aes(x=CRG, y=Prob, col=Anyo)) + geom_point() + 
+# #     scale_fill_manual(values=colorAnyo) +
+#      theme(axis.text.x = element_text(size = 7, colour = "black")) + 
+#      theme(title = element_text(size = 7, colour = "black")) + 
+#      labs(x="CRG-base", y="Probabilidad",
+#         title=paste("Evolución de probabilidad de ocurrencia de ATCs", anyo, sep=""))
+#    suppressMessages(print(g))
+#
+
+rm(u)
+rm(atc)
+rm(atc_f)
+rm(m)
+
+  #pacientes <- as.data.frame(cbind(dx$Id, dx$CRG, 
+  #                      dx$totalATCTodos, dx$totalATCDiabeticos, dx$totalATCOtros,
+  #                      rep(1.01, length(dx$Id)), rep(1.01, length(dx$Id)), 
+  #                      rep(1.01, length(dx$Id))))
+  #colnames(pacientes) <- c("Id", "CRG", "TotalATCs", "TotalATCDiab", "TotalATCOtros", 
+  #                           "%TotalATc", "%TotalATCDiab", "%TotalATCOtros")
+
+  #  #Calculamos los totales por edad y por edad y crg para que poder calcular el %.
+  #  df <- as.data.frame(sqldf("select CRG, sum(totalATCTodos) as TotalATCs, 
+  #                            sum(totalATCDiabeticos) as TotalATCDiab, 
+  #                            sum(totalATCOtros) as TotalATCOtros
+  #                            from dx group by CRG"))
+  #
+  #  #Calculamos el %
+  #  for (i in 1:nrow(pacientes)) {
+  #    pacientes[i, "%TotalATc"] <- as.numeric(round(pacientes[i, "TotalATCs"] / df[df$CRG == #pacientes$CRG[i], "TotalATCs"], 4))
+  #    pacientes[i, "%TotalATCDiab"] <- as.numeric(round(pacientes[i, "TotalATCDiab"] / df[df$CRG == #pacientes$CRG[i], "TotalATCDiab"], 4))
+  #    pacientes[i, "%TotalATCOtros"] <- as.numeric(round(pacientes[i, "TotalATCOtros"] / df[df$CRG == #pacientes$CRG[i], "TotalATCOtros"], 4))
+ #   }
+#    pacientes$CRG <- factor(pacientes$CRG)
+ #   i <- 1 #variable para pintar el CRG del color apropiado. 
+#    par(mfrow=c(1,2))
+#    
+#    for (crg in unique(dx$CRG)) {
+#      cat(paste("\n\nGráfica ATC.CRG.", i, ".", anyo, ": ", crg, 
+#                " - Distribución de Pacientes por toma de ATCs",
+#                ", Número de pacientes: ", length(pacientes[pacientes$CRG==crg, "CRG"]), "\n\n", #sep=""))
+ #     
       #Pintamos el gráfico con ambas líneas
       #Pintamos el gráfico de total.
-      par(mfrow=c(1,1))
-      plot(pacientes[pacientes$CRG==crg, "%TotalATc"], type = "l", cex.axis = 0.7,  
-        col="red",
-        xlab = "Número de pacientes", ylab="% de ATCs (total)")
-      lines(pacientes[pacientes$CRG==crg, "%TotalATCDiab"], col="blue")
-      title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
-          cex.main=0.7)
+  #    par(mfrow=c(1,1))
+  #    plot(pacientes[pacientes$CRG==crg, "%TotalATc"], type = "l", cex.axis = 0.7,  
+  #      col="red",
+  #      xlab = "Número de pacientes", ylab="% de ATCs (total)")
+  #    lines(pacientes[pacientes$CRG==crg, "%TotalATCDiab"], col="blue")
+  #    title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
+  #        cex.main=0.7)
       
-      par(mfrow=c(1,2))
+  #    par(mfrow=c(1,2))
       #Pintamos el gráfico de total.
-      plot(pacientes[pacientes$CRG==crg, "%TotalATc"], type = "l", cex.axis = 0.7,  
-           col=colorCRG[i],
-           xlab = "Número de pacientes", ylab="% de ATCs (total)")
-      title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
-            cex.main=0.65)
+  #    plot(pacientes[pacientes$CRG==crg, "%TotalATc"], type = "l", cex.axis = 0.7,  
+  #         col=colorCRG[i],
+  #         xlab = "Número de pacientes", ylab="% de ATCs (total)")
+  #    title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
+  #          cex.main=0.65)
       
       #Pintamos el gráfico de total de ATCs
-      plot(pacientes[pacientes$CRG==crg, "%TotalATCDiab"], type = "l", cex.axis = 0.7,  
-           col=colorCRG[i],
-           xlab = "Número de pacientes", ylab="% de ATCs (Diabéticos)")
-      title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
-            cex.main=0.65)
+  #    plot(pacientes[pacientes$CRG==crg, "%TotalATCDiab"], type = "l", cex.axis = 0.7,  
+  #         col=colorCRG[i],
+  #         xlab = "Número de pacientes", ylab="% de ATCs (Diabéticos)")
+  #    title(main=paste("CRG:", crg, ", Año:", anyo, " - Distribución de probabilidad de ATC", sep=""), 
+  #          cex.main=0.65)
 
-      i <- i + 1
-    }#fin bucle CRG.
-}#fin de bucle de año.
+  #    i <- i + 1
+  #  }#fin bucle CRG.
+#}#fin de bucle de año.
   
-rm(m)
-rm(g)  
-rm(csv2)
-rm(crg)
-rm(pacientes)
-rm(dx)
-rm(i)
-rm(df)
+#rm(m)
+#rm(g)  
+#rm(csv2)
+#rm(crg)
+#rm(pacientes)
+#rm(dx)
+#rm(i)
+#rm(df)
 ```
 
+#Probabilidad de ocurrencia de un medicamento (normalizando a partir del número de pacientes)
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+m <- matrix(nrow=0, ncol=4)
+  
+#Iteramos por año.
+for (anyo in unique(csv$Anyo)) {
+  #Generamos título Nivel 2
+  cat(paste("\n\n##Año ", anyo, "\n\n"))
+  
+  cat("###Generacíon de gráficas individuales por CRG-base\n\n")
+  
+  atc <- subset(csv, csv$Anyo == anyo)
+  atc <- atc[,c(6,7:(ncol(atc) - N))]
+  par(mfrow=c(2,1), mar=c(3,2,3,2))
+  i <- 1
+  for (crg in unique(atc$CRG)) {
+    cat(paste("\n\nGráfica ATC.CRG[", crg, "] - ", anyo, 
+                " - Distribución de la Proporción de la toma de ATCs",
+                ", Número de pacientes: ", length(atc[atc$CRG==crg, "CRG"]), "\n\n", sep=""))
+
+    #Filtramos por el ATC
+    atc_crg <- subset(atc, atc$CRG == crg)
+    atc_crg <- atc_crg[,-1]
+    
+    #Sumamos el total de las dispensaciones.
+    t <- apply(atc_crg, 2, convierteExistencia)
+    atc_col <- 100*apply(t, 2, sum)/nrow(t)
+    p <- atc_col
+    n <- names(atc_col)
+    a <- rep(anyo, length(p))
+    c <- rep(crg, length(p))
+    m <- rbind(m, cbind(a, c, n, p))
+    rownames(m) <- c()
+
+    label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+    pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+    plot(atc_col, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC", sep=""), 
+            cex.main=0.65)
+
+    plot(atc_col[atc_col >= quantile(atc_col, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col[atc_col >= quantile(atc_col, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col[atc_col >= quantile(atc_col, 0.96)])), 
+           labels=names(atc_col[atc_col >= quantile(atc_col, 0.96)]), cex.axis = 0.5, las=3)
+    title(main=paste("ZOOM: ATCs con mayor Ocurrencia", sep=""), 
+            cex.main=0.65)
+    abline(h=25, col="red")
+    abline(h=50, col="red")
+    abline(h=75, col="red")
+    
+    i <- i+1
+  }
+}
+  
+rm(atc_crg)
+rm(atc_col)
+rm(atc)
+rm(i)
+#rm(dx)
+rm(anyo)
+rm(label)
+rm(pos)
+rm(c)
+rm(p)
+rm(n)
+rm(a)
+rm(t)
+  
+#Una vez que se ha finalizado la ejecución para los años, obtenemos los valores mayores.
+m <- as.data.frame(m)
+m <- as.data.frame(cbind(m, as.character(m[,2])))
+colnames(m) <- c("Anyo", "CRG", "Names", "Prob", "PosX")
+m$Anyo <- as.factor(m$Anyo)
+m$CRG <- as.factor(m$CRG)
+m$Prob <- round(as.numeric(as.character(m$Prob)), 4)
+m$PosX <- ifelse(m$CRG == 5424, 1, m$PosX)
+m$PosX <- ifelse(m$CRG == 6144, 2, m$PosX)
+#m$PosX <- ifelse(m$CRG == 7070, 3, m$PosX)
+m$PosX <- ifelse(m$CRG == 7071, 3, m$PosX)
+atc <- subset(m, m$CRG %in% c(5424, 6144, 7071) & m$Prob >= 25.0 )  
+
+
+#Ahora hay que concatenar las columnas que no estén en los otros CRGs y que estén en el previo.
+u <- unique(atc$Names)
+atc_f <- subset(m, m$CRG %in% c(5424, 6144, 7071) & m$Names %in% u)
+
+par(mfrow=c(1,2), mar=c(3,2,3,2))
+for (anyo in unique(m$Anyo)) {
+  t <- subset(atc_f, atc_f$Anyo==anyo)
+  t$CRG <- as.integer(as.character(t$CRG))
+  t$Prob <- as.numeric(t$Prob)
+
+  t5424 <- subset(t, t$CRG==5424)
+  t6144 <- subset(t, t$CRG==6144)
+  t7071 <- subset(t, t$CRG==7071)
+  plot(t5424$PosX, t5424$Prob*2, type ="p", ylim=c(0, 170), xlim=c(0.5, 3.5), yaxt="n", xaxt="n", pch=1)
+  points(t6144$PosX, t6144$Prob*2, pch=5)
+  points(t7071$PosX, t7071$Prob*2, pch=2)
+  axis(1,  at = unique(t$PosX), labels=unique(t$CRG), cex.axis=0.6)
+  axis(2, at = c(20, 40, 60, 80, 100, 120, 140, 160), 
+       labels=c(10, 20, 30, 40, 50, 60, 70, 80), cex.axis=0.6)
+  title(main="Año 2011 - Evolución de ATCs por CRG-base", cex.main=0.7)
+  for(i in 1:8) {
+    text(0.8, t5424[i,"Prob"]*2, t5424[i, "Names"], cex=0.7)
+    segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="steelblue")
+    segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="steelblue")
+  }
+  for(i in 9:15) {
+    text(3.2, t7071[i,"Prob"]*2, t7071[i, "Names"], cex=0.7)
+    segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="red")
+    segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="red")
+  }
+  i<-16
+  text(0.8, t5424[i,"Prob"]*2, t5424[i, "Names"], cex=0.7)
+  segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="steelblue")
+  segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="steelblue")
+}
+rm(t5424)
+rm(t6144)
+rm(t7071)
+rm(i)
+rm(u)
+rm(atc)
+rm(atc_f)
+rm(m)
+
+```

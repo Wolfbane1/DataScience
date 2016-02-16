@@ -1,0 +1,137 @@
+---
+title: "Clusterización"
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+###CARGA de DATOS. 
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+
+colorAnyo <- c("springgreen2", "turquoise")
+colorGenero <- c("slateblue3", "snow4")
+colorCRG <- c("thistle", 
+             "green", "yellow4", "yellow4", "yellow4", "red1", "yellow4", "red2",
+             "slateblue", "red3",       
+              "yellow2", "green1", "green2", "green3", "yellow2", "yellow2", "yellow2", "red4", 
+              "blue", "darkblue", "darkgrey")
+
+source("analisisbasico.R")
+source("clusterizacion.R")
+
+#procesamos el CSV final.
+ficheros <- c(ficheroDestino, ficheroFiltro)
+csv <- procesaCSV(ficheros)
+
+#liberación de variables
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheros)
+rm(ficheroNoTomanA10Destino)
+```
+
+#Revisión de Gráficas para la memoria.
+
+A continuación se muestran los datos seguidos para hacer una revisión de la clusterización. Se van a utilizar tres algoritmos para ver si se identifican resultados distintos:
+
+  a) DBSCAN. Este método agrupa de forma conjunta todos los elementos que tiene algún elemento de ese cluster a la distancia especificada. Dependiendo de la estructura de los datos puede tener resultados mejores que el K-MEANS. Toma como input la distancia que se quiere establecer entre los elementos, y, suele comenzar la parte de prueba de distancia a partir de la curva de inflexión de la curva de los K-vecinos más cercanos.
+  
+  b) K-MEANS. Este método pone puntos céntricos aleatorios (llamados centroides) y a partir de esos puntos comienza a calcular la distancia de todos los puntos a los centroides para agrupar. Toma como input el número de centroides de partida y el número de veces que se quiere que el algoritmo itere. 
+  
+  c) JERÁRQUICO. Este método genera tantos cluster al principio como elementos hay en el juego de datos. A partir de ahí comienza a agrupar en base a la distancia. No toma como partida ningún dato. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+cat("##DBSCAN\n\n")
+cat("###Alternativa 1: Sin eliminar outliers y Variables generadas ")
+columnasCopiar <- c("Sexo", "Edad", "totalATCDiabeticos", "totalATCOtros", 
+                    "numATCDiabeticos", "numATCOtros")
+cat("\n\n")
+cat(columnasCopiar)
+cat("\n\n")
+
+n <- 5
+
+  for(anyo in unique(csv$Anyo)) {
+    
+    #Preparamos la matriz (se obtiene) los datos del año y se aplican las transformaciones. 
+    d <- iniciaAnyo(csv, anyo)
+    d.m <- iniciaMatriz(d, columnasCopiar)
+    d.m.scaled <- as.data.frame(scale(d.m, center=TRUE, scale=TRUE))
+    
+    #Preparmos los vectores sobre los que vamos a iterar.
+    distancia <- c(0.3, 0.5, 1, 1.5)
+    elementos <- c(5, 10, 15, 20, 25, 50)
+    
+    #Ejecutamos el bucle. Permitiremos con un parámetro que pinte o no para ganar tiempo.
+    res <- iteraPorDistanciaElementos(d, d.m, d.m.scaled, distancia, elementos, FALSE)
+  }
+  
+  rm(columnasCopiar)
+  rm(d)
+  rm(d.m)
+  rm(d.m.scaled)
+  rm(distancia)
+  rm(elementos)
+  
+  pintarResultadoDBSCAN(res)
+```
+
+
+ggplot(df, aes(x=Distancia, y=NumElem, size=Cluster)) + 
+  geom_point(shape=21, fill="steelblue2") + 
+  scale_x_continuous(name="Distancia", breaks=unique(df$Distancia)) +
+  scale_y_continuous(name="Número de elementos mínimo en cluster", breaks=unique(df$NumElem)) +
+  scale_size("Número Cluster", breaks=c(3, 8, 10, 20, 40, 60)) + 
+  theme(axis.text.x = element_text(size = 10, colour = "black")) + 
+  theme(title = element_text(size = 10, colour = "black")) + 
+  theme(legend.text = element_text(size = 10)) + 
+  theme(legend.key.height = unit (0.4, "cm")) + 
+  labs(title="Relación del número de Cluster en función de los parámetros del método DBSCAN ")
+
+
+
+d <- d11.m
+d.m <- as.data.frame(d.m)
+
+#Cluster 0
+
+resultado <- matrix(nrow=0, ncol=)
+
+cluster
+
+n <- 5
+
+dm <- d.m
+d.m <- as.data.frame(d.m)
+  
+#Cluster 
+table(d.m[d.m$DBSCAN==n, "DBSCAN"])
+summary(d.m[d.m$DBSCAN==n, "Edad"])
+table(d.m[d.m$DBSCAN==n, "Sexo"])/nrow(d.m[d.m$DBSCAN==n,])
+table(d.m[d.m$DBSCAN==n, "CRG"])
+#summary(d.m[d.m$DBSCAN==n, "totalATCTodos"])
+#summary(d.m[d.m$DBSCAN==n, "numATCTodos"])
+summary(d.m[d.m$DBSCAN==n, "totalATCDiabeticos"] + d.m[d.m$DBSCAN==n, "totalATCOtros"])
+qplot(d.m[d.m$DBSCAN==n, "totalATCOtros"], d.m[d.m$DBSCAN==n, "totalATCDiabeticos"], geom="boxplot")
+summary(d.m[d.m$DBSCAN==n, "numATCDiabeticos"] + d.m[d.m$DBSCAN==n, "numATCOtros"])
+ 
+res
+

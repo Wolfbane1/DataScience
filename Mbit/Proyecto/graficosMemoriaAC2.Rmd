@@ -6,6 +6,9 @@ output: html_document
 ---
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
 origenData <- file.path(getwd(), "data")
 origenMat <- file.path(getwd(), "data", "mat")
 destinoCSV <- file.path(getwd(), "data", "csv")
@@ -16,13 +19,6 @@ ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
 
 colorAnyo <- c("springgreen2", "turquoise")
 colorGenero <- c("slateblue3", "snow4")
-#colorCRG <- c("tomato", 
-#              "slateblue", "darkblue", "mediumblue", "blue", "steelblue", "deepskyblue", "skyblue", 
-#                 "lightskyblue", "aliceblue",       
-#              "saddlebrown", "brown", "chocolate", "burlywood", "wheat", "bisque", "blanchedalmond", "beige", 
-#                 "cornsilk", "whitesmoke",  
-#              "seagreen" "darkseagreen", "olivedrab", "aquamarine",  "green", "lightseagreen", "springgreen", #"palegreen", "mediumspringgreen", "cyan",  
-#              "yellow" )
 colorCRG <- c("thistle", 
               "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
               "lemonchiffon", "red",       
@@ -78,22 +74,14 @@ cat(paste("\n\nGráfico AC.1.", anyo, " - Mosaico de ATCs - CRGs[5424, 6144, 707
 
 #Se reorganiza el mosaico para agrupar la información 
 v <- c(6, 4, 7, 1, 9, 3, 5, 13, 10, 2, 12, 8, 11, 14)
-cols = 3
-rows = 1
-m1 <- matrix(m[v[1],], ncol = cols, nrow=rows)
-for ( i in 2:length(v)) {
-  m1 <- rbind(m1, m[v[i],])
-}
-rownames(m1) <- rownames(m)
-for ( i in 1:length(v)) {
-  rownames(m1)[i] <- rownames(m)[v[i]]
-}
+cols <- 3
+rows <- 1
+main <- "Mosaico de ATCs - CRGs[5424, 6144, 7071]"
+pintaMosaico(v, rows, cols, main)
 
-mosaicplot(m1, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
-
-rm(m1)
 rm(cols)
 rm(rows)
+rm(main)
 rm(v)
 ```
 
@@ -173,22 +161,14 @@ cat(paste("\n\nGráfico AC.1.", anyo, " - Mosaico de ATCs - CRGs[5424, 6144, 707
 
 #Se reorganiza el mosaico para agrupar la información 
 v <- c(6, 4, 7, 1, 9, 3, 2, 5, 10, 12, 13, 8, 11, 14)
-cols = 3
-rows = 1
-m1 <- matrix(m[v[1],], ncol = cols, nrow=rows)
-for ( i in 2:length(v)) {
-  m1 <- rbind(m1, m[v[i],])
-}
-rownames(m1) <- rownames(m)
-for ( i in 1:length(v)) {
-  rownames(m1)[i] <- rownames(m)[v[i]]
-}
+cols <- 3
+rows <- 1
+main <- "Mosaico de ATCs - CRGs[5424, 6144, 7071]"
+pintaMosaico(v, rows, cols, main)
 
-mosaicplot(m1, shade = TRUE, main = "Mosaico de ATCs - CRGs[5424, 6144, 7071]")
-
-rm(m1)
 rm(cols)
 rm(rows)
+rm(main)
 rm(v)
 ```
 
