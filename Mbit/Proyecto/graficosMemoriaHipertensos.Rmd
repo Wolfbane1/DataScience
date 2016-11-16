@@ -504,7 +504,7 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
     m <- pintaGraficasPerfilesZoom(todos, lineas, 1)
 
     #Obtenemos los atcs que están por encima de la probabilidad 3.0 para los CRG-base en estudio.
-    atc <- subset(m, m$CRG %in% c(0, 5424, 6144, 7071) & m$Prob >= 3.0 )  
+    atc <- subset(m, m$CRG %in% c(0, 5192, 6124, 6144, 7070) & m$Prob >= 3.0 )  
 
     #Pintamos la gráfica que le gusta a Cristina :). 
     cat("\n\n####Gráfica de Evolución: La de Cristina\n\n")
@@ -516,12 +516,12 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
     m <- pintaGraficasPerfilesZoom(todos, lineas, 2)
   
     #Obtenemos los atcs que están por encima de la probabilidad 3.0 para los CRG-base en estudio.
-    atc <- subset(m, m$CRG %in% c(0, 5424, 6144, 7071) & m$Prob >= 25 ) 
+    atc <- subset(m, m$CRG %in% c(0, 5192, 6124, 6144, 7070) & m$Prob >= 25 ) 
 
     #Pintamos la gráfica que le gusta a Cristina :). 
     cat("\n\n####Gráfica de Evolución: La de Cristina\n\n")
     etiquetas <- c(10, 20, 30, 40, 50, 60, 70, 80)
-    pintaGráficaCristina(atc, m, etiquetas, 2)
+    pintaGráficaCristinaHipertension(atc, m, etiquetas, 2)
     
   rm(m)
   rm(atc)
@@ -536,14 +536,14 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
   #Preparación de parámetros y de semilla. 
   longitud <- 1000
   tamaño <- 100
-  crgs <- c(5424, 6144, 7071)
+  crgs <- c(5192, 6124, 6144, 7070)
   set.seed(100)
     
   for (anyo in unique(csv$Anyo) ) {
     cat(paste("\n\n###Año ", anyo, "\n\n", sep=""))
     salida <- list()
     for( crg in crgs ) {
-      matriz <- generaMatriz(anyo, crg, longitud, tamaño)
+      matriz <- generaMatriz(csv, anyo, crg, longitud, tamaño)
       media <- apply(matriz, 2, mean)
       high <- apply(matriz, 2, IC_high)
       low <- apply(matriz, 2, IC_low)
@@ -561,7 +561,7 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
     
     #Pintamos el ejemplo del boxplot para cada CRG.
     par(mfrow=c(1,3))
-    names(salida) <- c(5424, 6144, 7071)
+    names(salida) <- c(5190, 6124, 6144, 7070)
     cat(paste("\n\n<b>Gráfico IC para A10E para corroborar la caída de la gráfica de Cristina [Año=", 
               anyo, "]\n\n", sep=""))
     for (i in 1:length(salida)) {
@@ -594,7 +594,7 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
   #Preparación de parámetros y semilla.
   longitud <- 1000
   tamaño <- 100
-  crgs <- c(5424, 6144, 7071)
+  crgs <- c(5192, 6124, 6144, 7070)
   leyenda <- c("Género 1", "Género 2")
   set.seed(321)
     
@@ -608,7 +608,7 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
       fichero <- paste(salidaGrafica, "perfilSexo_", crg, "_", anyo, ".png", sep="")
     
       #Generamos los gráficos.
-      (media_h, media_m, crg, anyo, fichero, colorGenero, leyenda)
+      pintaDiferenciaMedia(media_h, media_m, crg, anyo, fichero, colorGenero, leyenda)
       
       #Lo incrustamos en el HTML
       cat(paste("\n\n<b>Gráfico comparativo por Sexo para ", crg, " y año ", anyo, "</b>\n\n", sep=""))
@@ -625,66 +625,6 @@ NOTA ANÁLISIS 2012: Visualmente no se observan diferencias significativas en la
   rm(anyo)
   rm(crgs)
   rm(crg)
-  rm(fichero)
-```
-
-##Contraste de la media por Sexo del perfil de los ATCs para la Evolución de los pacientes
-
-Ojo, en este apartado se contempla:
-- Pacientes que en 2011 estaban en 5424.
-- Pacientes que en 2012 siguen en 5424 o han evolucionado a 6144.
-
-```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
-  #Preparación de parámetros y de semilla
-  longitud <- 1000
-  tamaño <- 100
-  leyenda <- c("5424", "6144")
-  color <- c("red", "slateblue")
-  set.seed(567)
-    
-  cat(paste("\n\n<b>Gráfico de Evolución de Patrón General</b>\n\n", sep=""))
-    matriz_e_5424 <- generaMatrizEvolucion(2012, 5424, 1000, 100)
-    matriz_e_6144 <- generaMatrizEvolucion(2012, 6144, 1000, 100)
-      media_e_m5424 <- apply(matriz_e_5424, 2, mean)
-      media_e_m6144 <- apply(matriz_e_6144, 2, mean)
-    
-    fichero <- paste(salidaGrafica, "perfilEvolución_5424_6144_2012.png", sep="")
-    pintaDiferenciaMedia(media_e_m5424, media_e_m6144, 5424, 2011, fichero, color, leyenda)
-    cat(paste("\n\n<img src='", fichero, "' WIDTH=600 HEIGHT=480>\n\n", sep=""))
-    
-  rm(matriz_e_5424)
-  rm(matriz_e_6144)
-  rm(media_e_m5424)
-  rm(media_e_m6144)
-
-  cat(paste("\n\n<b>Gráfico de Evolución de Patrón por Sexo</b>\n\n", sep=""))
-    matriz_eh_5424 <- generaMatrizEvolucionSexo(2012, 5424, 1000, 100, 1)
-    matriz_em_5424 <- generaMatrizEvolucionSexo(2012, 5424, 1000, 100, 2)
-      media_eh_m5424 <- apply(matriz_eh_5424, 2, mean)
-      media_em_m5424 <- apply(matriz_em_5424, 2, mean)
-  
-    matriz_eh_6144 <- generaMatrizEvolucionSexo(2012, 6144, 1000, 100, 1)
-    matriz_em_6144 <- generaMatrizEvolucionSexo(2012, 6144, 1000, 100, 2)
-      media_eh_m6144 <- apply(matriz_eh_6144, 2, mean)
-      media_em_m6144 <- apply(matriz_em_6144, 2, mean)
-
-    fichero <- paste(salidaGrafica, "perfilEvolucionHombre_5424_6144_2012.png", sep="")
-    pintaDiferenciaMedia(media_eh_m5424, media_eh_m6144, 5424, 2011, fichero, color, leyenda)
-    cat(paste("\n\n<img src='", fichero, "' WIDTH=600 HEIGHT=480>\n\n", sep=""))
-
-    fichero <- paste(salidaGrafica, "perfilEvolucionMujer_5424_6144_2012.png", sep="")    
-    pintaDiferenciaMedia(media_em_m5424, media_em_m6144, 5424, 2011, fichero, color, leyenda)
-    cat(paste("\n\n<img src='", fichero, "' WIDTH=600 HEIGHT=480>\n\n", sep=""))
-  
-  rm(matriz_eh_5424)
-  rm(matriz_eh_6144)
-  rm(media_eh_m5424)
-  rm(media_eh_m6144)
-  rm(matriz_em_5424)
-  rm(matriz_em_6144)
-  rm(media_em_m5424)
-  rm(media_em_m6144)
-  
   rm(fichero)
   rm(color)
   rm(leyenda)

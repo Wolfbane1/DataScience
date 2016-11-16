@@ -1,0 +1,225 @@
+---
+title: "Revisión Testeos significativos Wilcoxon en perfiles "
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
+
+source("analisisbasico.R")
+source("PCAs.R")
+
+#procesamos el CSV final.
+#ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+#csv <- procesaCSVDiabeticos(ficheros)
+#sanos <- procesaCSVSanos(ficheros)
+
+#liberación de variables
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheroSanos)
+rm(origenSanos)
+rm(ficheroNoTomanA10Destino)
+
+#Parámetros globales a usar
+longitud <- 1000
+tamaño <- 100
+crgs <- c(5424, 6144, 7071)
+bucle <- 10
+```
+
+#Análisis de la información generada
+
+Vamos a revisar ahora la información generada a partir de todos los bucles realizados. Hay que destacar:
+
+  a) Visión Global --> Se tienen en cuenta todos los pacientes.
+  
+  b) Visión Evolución --> Se tienen en cuenta solo los pacientes que estaban en 5424 en 2011 y que han quedado en 5424 o han evolucionado a 6144 en 2012.
+  
+En ambos casos, siempre se separa por Sexo o se tiene de forma "global" sin separar por sexo.
+
+IMPORTANTE: En cualquier caso, para no pintar todos los ATCs cuya distribución es significativa, he sacado solo aquellos en los que la diferencia entre la media del ATC (después de las 1000 iteraciones) entre un grupo CRG y otro es superior a 0.03 (Nota para Inma: los datos están en %1).
+
+La estructura de los ficheros que os he pasado antes de comer son:
+  
+  * Tipo —> Columna que indica si es de tipo Global (contiene todos los pacientes) o Evolución (contiene los pacientes en 2011 estaban en 5424 y en 2012 se han mantenido o han evolucionado). 
+
+  * Iteración —> Número de iteraciones (en cada iteración se hacen las 1000 iteraciones de 100 pacientes como hicimos el viernes).
+
+  * Año —> Año. 
+
+  * Sexo —> Todos cuando no se diferencia por sexo o Sexo_1 / Sexo_2 cuando se hace diferenciando la media de los Sexos. 
+
+  * ATC —> El código de ATC
+
+  * CRG Origen —> 
+
+  * CRG Destino —> 
+
+  * Media CRG1 —> Media del ATC (de las 1000 iteraciones) para el CRG Origen. 
+
+  * Media CRG2 —> Media del ATC en el CRG Destino. 
+
+  * pValue —> El resultado del pValue del Test de Wilcoxon.
+
+##Visión Global sin separar por Sexo.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+#Leemos el fichero y filtramos aquellos registros que tienen una media de 0. 
+fichero <- paste(salidaDatos, "global_perfil.csv", sep="")  
+g <- read.csv(fichero)
+pintaATCsWilcoxon(g, "Todos")
+rm(fichero)
+rm(g)
+```
+
+##Visión Global Separar por Sexo.
+
+###Hombres
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+#Leemos el fichero y filtramos aquellos registros que tienen una media de 0. 
+fichero <- paste(salidaDatos, "global_sexo_perfil.csv", sep="")  
+g <- read.csv(fichero)
+g <- subset(g, g$Sexo == "Sexo_1")
+pintaATCsWilcoxon(g, "Sexo_1")
+rm(fichero)
+rm(g)
+```
+
+###Mujeres
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- paste(salidaDatos, "global_sexo_perfil.csv", sep="")  
+g <- read.csv(fichero)
+g <- subset(g, g$Sexo == "Sexo_2")
+pintaATCsWilcoxon(g, "Sexo_2")
+rm(fichero)
+rm(g)
+```
+
+    NOTA ANÁLISIS:Analizando las diferencias entre 5424 y 6144, primero por separado y de forma conjunta el perfil global y luego la separación del perfil de hombres y mujeres. Algunas de las conclusiones más significativas son:
+
+    <b>Perfil Global</b>
+
+    En 2012 los ATCs N02AX, S01XA, A10BD y A10BB tienen mayor diferencia entre las medias de las poblaciones. 
+
+    A10BB —> Sulfonylureas (medicamento para bajar la glucosa en sangre que no es insulina).
+    A10BD —> Combinación de medicina oral para bajar la glucosa en sangre.
+    N02AX —> Others Opioids
+    S01XA —> Other ophthalmologicals
+
+    <b>Perfil Diferenciado por Sexo</b>
+    
+    Se sigue notando que las mujeres dispensan más medicamentos en general. Caso curioso el del N02BE (paracetamol) que hay bastante diferencia entre ambas medias. Ya sabemos quién va más a la farmacia a comprar el paracetamol :).
+
+    <i>Hombres</i>
+    * En los hombres hay ciertos ATCs que no aparecen (recordad el filtro del 0.03 en la diferencia de ambas distribuciones) en las mujeres: G04CA, A10BX, D07AC. 
+    * El ATC C02CA parece que está más relacionado con los hombres, aunque las mujeres también la toman..  
+    * No se ven diferencias significativas entre 2011 y 2012, aunque el orden de algunos ATCs cambian.
+
+    A10BX —> Other blood glucose lowering drugs, excl. insulins
+    C02CA —> Alpha-adrenoreceptor antagonists
+    D07AC —> Corticosteroids, potent (group III)
+    G04CA —> Alpha-adrenoreceptor antagonists (medicamento para hiperplasia benigna de próstata).
+
+    <i>Mujeres</i>
+    * En las mujeres hay ciertos ATCs que no aparecen en los hombres:C03FA, C03AA, A12AX, N05CD, A02AD, B01AA, G01AF, R05CD, J01MA, N03AX, C05CA, N06AX.
+    * Los ATCs M02AA, N05BA, N02AX, N02BB, C03BA tienen más relación con las mujeres. Aunque no podremos saber si es que lo toman o es el mismo caso que el del paracetamol. 
+    * Además, hay diferencias entre 2011 y 2012: En 2012 aparecen G03AA, N07CA, B03BA, R05DB, A03FA, M01AE, J01XX, C10AB, N03AX, A05CD.
+
+    A02AD —> Combinations and complexes of aluminium, calcium and magnesium compounds. Curioso, esto si es más propio de las mujeres por la menopausia y la pérdida de cálcio. A mi madre le mandaron calcio. 
+    A03FA —> Propulsives
+    A05CD —> Drogas para terapia biliar y lipotrópicos en combinación
+    A12AX —> Calcium, combinations with vitamin D and/or other drugs
+    B01AA —> Vitamin K antagonists (suele estar relacionado con la coagulación en sangre).
+    B03BA —> Vitamin B12 (cyanocobalamin and analogues) (se usa para producir glóbulos rojos, en contra de anemias o para enfermedades de corazón)
+    C10AB —> Fibrates
+    C03AA —> Thiazides, plain
+    C03BA —> Sulfonamides, plain
+    C03FA —> Este código no lo encuentro en internet. 
+    C05CA —> Bioflavonoids
+    G01AF —> Imidazole derivatives
+    G03AA —> Progestogens and estrogens, fixed combinations
+    J01MA —> Fluoroquinolones
+    J01XX —> Other antibacterials 
+    M01AE —> Propionic acid derivatives
+    M02AA —> Antiinflammatory preparations, non-steroids for topical use
+    N02AX —> Ya visto arriba.
+    N02BB —> Pyrazolones
+    N03AX —> Other antiepileptics
+    N05BA —> Benzodiazepine derivatives
+    N05CD —> Benzodiazepine derivatives (qué raro que haya dos familias con el mismo nombre. N05B son anxiolíticos y N05C son sedantes e hipnóticos)
+    N06AX —> Other antidepressants ( mira, algo bonito de ser hombre :-) )
+    N07CA —> Antivertigo preparations (qué raro que haya aparecido este medicamento en 2012 … )
+    R05CD —> Este ATC no lo encuentro en Internet. ¿Cómo puede ser?
+    R05DB —> Other cough suppressants
+
+##Visión Evolución sin separar por Sexo.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+#Leemos el fichero y filtramos aquellos registros que tienen una media de 0. 
+fichero <- paste(salidaDatos, "evolucion_global_perfil.csv", sep="")  
+g <- read.csv(fichero)
+pintaATCsWilcoxon(g, "Todos")
+rm(fichero)
+rm(g)
+```
+
+##Visión Evolución Separar por Sexo.
+
+###Hombres
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+#Leemos el fichero y filtramos aquellos registros que tienen una media de 0. 
+fichero <- paste(salidaDatos, "evolucion_sexo_perfil.csv", sep="")  
+g <- read.csv(fichero)
+g <- subset(g, g$Sexo == "Sexo_1")
+pintaATCsWilcoxon(g, "Sexo_1")
+rm(fichero)
+rm(g)
+```
+
+###Mujeres
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+fichero <- paste(salidaDatos, "evolucion_sexo_perfil.csv", sep="")  
+g <- read.csv(fichero)
+g <- subset(g, g$Sexo == "Sexo_2")
+pintaATCsWilcoxon(g, "Sexo_2")
+rm(fichero)
+rm(g)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Eliminación de variables globales.
+rm(longitud)
+rm(tamaño)
+rm(crgs)
+rm(bucle)
+```

@@ -8,15 +8,22 @@ suppressPackageStartupMessages(library(vcd))
 #Importaciones de otros ficheros.
 source("PCAs.R")
 
+atcImportantes <- c("A02BC","A03FA","A06AD","A10BA","A10AE","B01AC","C03CA","C08CA","C09AA","C10AA","G04CA","J01MA","M02AA",
+                    "N02BB","N02BE","N05AL", "N05BA", "R03AC","R03AK","R03BB","R05CB")
+
 getCRGDiabHipertensionAtc <- function(csv, anyo, tipo) {
   #Obtenemos los datos del año.
   dx <- subset(csv, csv$Anyo == anyo)
   
-  m_sumaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, tipo)
-  #Le concatenamos el código de CRG para filtrar por los códigos que queremos. 
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$CRG)
-  colnames(m_sumaFamilias)[15] <- "CRG"
-  
+  #Filtramos por los ATCs importantes y añadimos el CRG.
+  #  Si es "Suma" no convertimos los ATCs a existencia.
+  if (tipo == "SUMA_FAMILIAS" ) m_sumaFamilias <- dx[, c(atcImportantes, "CRG")]
+  if (tipo == "EXISTENCIA") {
+    m_sumaFamilias <- apply(dx[, atcImportantes], 2, convierteExistencia)
+    m_sumaFamilias <- cbind(m_sumaFamilias, dx$CRG)
+    colnames(m_sumaFamilias)[ncol(m_sumaFamilias)] <- c("CRG")
+  }
+   
   m_5424 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"CRG"] == 5424), 2, sum))
   colnames(m_5424) <- c("CRG_5424")
   m_6144 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"CRG"] == 6144), 2, sum))
@@ -45,9 +52,12 @@ getAtcSexo <- function(csv, anyo, tipo) {
   #Obtenemos los datos del año.
   dx <- subset(csv, csv$Anyo == anyo)
 
-  m_sumaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, tipo)
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$Sexo)
-  colnames(m_sumaFamilias)[15] <- "Sexo"
+  if (tipo == "SUMA_FAMILIAS" ) m_sumaFamilias <- dx[, c(atcImportantes, "Sexo")]
+  if (tipo == "EXISTENCIA") {
+    m_sumaFamilias <- apply(dx[, atcImportantes], 2, convierteExistencia)
+    m_sumaFamilias <- cbind(m_sumaFamilias, dx$Sexo)
+    colnames(m_sumaFamilias)[ncol(m_sumaFamilias)] <- c("Sexo")
+  }
   
   #Le concatenamos el código de CRG para filtrar por los códigos que queremos. 
   m_S1 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"Sexo"] == 1), 2, sum))
@@ -104,10 +114,9 @@ getATCsCRGsEdad <- function(csv, anyo) {
   #Obtenemos los datos del año.
   dx <- subset(csv, csv$Anyo == anyo & csv$CRG %in% c(5424, 6144, 7071))
   
-  m_sumaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "EXISTENCIA")
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$CRG)
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$RangoEdad)
-  colnames(m_sumaFamilias)[15:16] <- c("CRG", "RangoEdad")
+  m_sumaFamilias <- apply(dx[, atcImportantes], 2, convierteExistencia)
+  m_sumaFamilias <- cbind(as.data.frame(m_sumaFamilias), dx$CRG, dx$RangoEdad)
+  colnames(m_sumaFamilias)[(ncol(m_sumaFamilias)-1):ncol(m_sumaFamilias)] <- c("CRG", "RangoEdad")
   
   EscribeDimensionalidadTabla(m_sumaFamilias)
   
@@ -136,11 +145,10 @@ getATCsCRGsSexo <- function(csv, anyo) {
   #Obtenemos los datos del año.
   dx <- subset(csv, csv$Anyo == anyo & csv$CRG %in% c(5424, 6144, 7071))
   
-  m_sumaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "EXISTENCIA")
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$CRG)
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$Sexo)
-  colnames(m_sumaFamilias)[15:16] <- c("CRG", "Sexo")
-  
+  m_sumaFamilias <- apply(dx[, atcImportantes], 2, convierteExistencia)
+  m_sumaFamilias <- cbind(as.data.frame(m_sumaFamilias), dx$CRG, dx$Sexo)
+  colnames(m_sumaFamilias)[(ncol(m_sumaFamilias)-1):ncol(m_sumaFamilias)] <- c("CRG", "Sexo")
+
   EscribeDimensionalidadTabla(m_sumaFamilias)
   
   #Eliminamos variables
@@ -172,10 +180,10 @@ getATCs2011CRGs2012 <- function(csv) {
                  Si_2011_Si_2012$CRG_12 %in% c(5424, 6144, 7071))
   dx2 <- subset(csv, csv$Anyo == 2011 & csv$Id %in% dx$Id )
   
-  m_sumaFamilias <- reduceMatrizATC(dx2, 7:(ncol(dx2)-N), 1, "EXISTENCIA")
-  m_sumaFamilias <- cbind(m_sumaFamilias, dx$CRG_12)
-  colnames(m_sumaFamilias)[15] <- c("CRG")
-  
+  m_sumaFamilias <- apply(dx2[, atcImportantes], 2, convierteExistencia)
+  m_sumaFamilias <- cbind(as.data.frame(m_sumaFamilias), dx$CRG_12)
+  colnames(m_sumaFamilias)[ncol(m_sumaFamilias)] <- c("CRG_12")
+
   EscribeDimensionalidadTabla(m_sumaFamilias)
   
   #Eliminamos variables
@@ -185,35 +193,40 @@ getATCs2011CRGs2012 <- function(csv) {
   return(as.data.frame(m_sumaFamilias))
 }
 
+
+
 getAtcEdad <- function(csv, anyo, tipo) {
   #Obtenemos los datos del año.
   dx <- subset(csv, csv$Anyo == anyo)
-  
-  m_sumaFamilias <- as.data.frame(reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, tipo))
-  m_sumaFamilias <- as.data.frame(cbind(m_sumaFamilias, dx$RangoEdad))
-  colnames(m_sumaFamilias)[15] <- "RangoEdad"
+
+  if (tipo == "SUMA_FAMILIAS" ) m_sumaFamilias <- dx[, c(atcImportantes, "RangoEdad")]
+  if (tipo == "EXISTENCIA") {
+    m_sumaFamilias <- apply(dx[, atcImportantes], 2, convierteExistencia)
+    m_sumaFamilias <- cbind(as.data.frame(m_sumaFamilias), dx$RangoEdad)
+    colnames(m_sumaFamilias)[ncol(m_sumaFamilias)] <- c("RangoEdad")
+  }
   
   #Le concatenamos el código de CRG para filtrar por los códigos que queremos. 
   
-  m_R1 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R1", 1:14), 2, sum))
+  m_R1 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R1", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R1) <- c("[0, 49)")
   colnames(m_R1) <- c("R1")
-  m_R2 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R2", 1:14), 2, sum))
+  m_R2 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R2", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R2) <- c("[49, 55)")
   colnames(m_R2) <- c("R2")
-  m_R3 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R3", 1:14), 2, sum))
+  m_R3 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R3", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R3) <- c("[55, 59)")
   colnames(m_R3) <- c("R3")
-  m_R4 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R4", 1:14), 2, sum))
+  m_R4 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R4", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R4) <- c("[59, 63)")
   colnames(m_R4) <- c("R4")
-  m_R5 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R5", 1:14), 2, sum))
+  m_R5 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R5", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R5) <- c("[63, 68)")
   colnames(m_R5) <- c("R5")
-  m_R6 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R6", 1:14), 2, sum))
+  m_R6 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R6", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R6) <- c("[68, 78)")
   colnames(m_R6) <- c("R6")
-  m_R7 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R7", 1:14), 2, sum))
+  m_R7 <- as.data.frame(apply(subset(m_sumaFamilias, m_sumaFamilias[,"RangoEdad"] == "R7", 1:length(atcImportantes)), 2, sum))
   #colnames(m_R7) <- c("[78, 103]")
   colnames(m_R7) <- c("R7")
   
@@ -286,7 +299,7 @@ pintaMosaicoATCs <- function(v, rows, cols, main) {
   }
 
   par(mfrow=c(1,1), mar=c(4,4,3,3))
-  mosaicplot(m1, shade = TRUE, main = main)
+  mosaicplot(m1, shade = TRUE, main = main, las=2)
   
   rm(m1)
 }
@@ -559,13 +572,7 @@ pintaNotaAnalisis <- function(ac, funcion, anyo, i, j) {
   if (ac == "C.1") pintaNotaAnalisis_C1(funcion, anyo, i, j) 
   if (ac == "C.2") pintaNotaAnalisis_C2(funcion, anyo, i, j) 
   
-  #CRGs (5424, 6144, 7070, 7071) y Sexo
-  if (ac == "D") pintaNotaAnalisis_D(funcion, anyo, i, j) 
-  
-  #CRG(5424, 6144, 7071) y Edad
-  if (ac == "E") pintaNotaAnalisis_E(funcion, anyo, i, j) 
-  
-  #ATCs (14 familias principales), CRGs (5424, 6144, 7071) y Rango de Edad
+  #ATCs (atcsImportantes), CRGs (5424, 6144, 7071) y Rango de Edad
   if (ac == "F") pintaNotaAnalisis_F(funcion, anyo, i, j) 
   
   
@@ -577,83 +584,88 @@ pintaNotaAnalisis_A1 <- function(funcion, anyo, i, j) {
   #Dimensionalidad
   if ( funcion == "A") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que todas las frecuencias son superiores 
-          a 5, por lo que es apropiado que utilicemos luego el método de Chi^2. Si no fuera el caso, 
-          deberíamos utilizar el método de Fisher.")
+      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que para el medicamento N05AL hay valores a 0. 
+          Esto nos va a afectar a la hora de invocar al método de Chi^2. TO-DO: ¿Utilizamos el método Fisher?.")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que todas las frecuencias siguen siendo superiores 
-          a 5.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que para el medicamento N05AL hay valores a 0. 
+          Esto nos va a afectar a la hora de invocar al método de Chi^2. TO-DO: ¿Utilizamos el método Fisher?.")
     }
   }
   
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("NOTA ANÁLISIS: Como primer vistazo se puede identificar:\n\n")
-      cat("a) H, D, J son ATCs con un comportamiento similar en relación a los valores 5424 y 7071. Parece que la frecuencia de uso cuando es 
-          diabetes e hipertensión (sin que estén agravados por una tercera enfermeadad) disminuye.\n\n")
-      cat("b) A, M son ATCs con un comportamiento similar y parece que está más relacionado con el 
-            CRG-base 5424.\n\n")
-      cat("c) C, G, S son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 6144.\n\n")
-      cat("d) N, B, R son ATCs con un comportamiento similar y parece que está más relacionado con el CRG-base 7071.\n\n")
-      cat("e) L, P, V son ATCs con pocos valores, en comparación al resto, y que no parece identificarse con ningún CRG-base de los tres en análisis.\n\n")
+      cat("NOTA ANÁLISIS: Como primer vistazo se puede identificar que al utilizar todos los ATCs se tiene más 
+          detalle de relación de ciertos ATCs con respecto a la agrupación a la primera familia. Por ejemplo:\n\n")
+      cat("a) A02BC tiene más frecuencia en el 7071 que en los otros dos CRG-bases. Esto quedaba 'oculto' en los resultados 
+            anteriores que teníamos.\n\n")
+      cat("b) Aunque C10AA está también relacionado con el CRG-base 5424 en realidad parece que el resto de ATCs 
+            de la familia C se relacionan más con el CRG-base 6144.\n\n")
+      cat("c) La familia Nxxxx parece que tiene más relación con el CRG-base 7071.\n\n")
     }
     
     if (anyo == 2012) {
       cat("\t\tNOTA ANÁLISIS: Si comparamos el gráfico mosáico con el correspondiente al año 2011 se puede
-          observar que en general sigue la misma estructura de patrones para los grupos ATCs, aunque si se 
-          puede comprobar que hay un cambio significativo para los grupos ATCs S y B.\n\n
-          a) En el caso de la familia S, se observa que la frecuencia para el CRG-base 6144 pasa a ser la esperada.\n\n
-          b) En el caso de la familia B, se observa que para el CRG-base 6144 ha aumentado la frecuencia con respecto a 
-          esperado y sin embargo, para el CRG-base 7071 ha bajado la frecuencia con respecto a lo esperado.\n\n
-          TO-DO: Habría que hacer un análisis más detallado en esta parte para bajar al detalle del cambio.")
+          observar que en general sigue la misma estructura de patrones para los ATCs, aunque se observan dos 
+          pequeños cambios:\n\n
+          a) A10BA: En 2012 se pone rojo en su relación con 6144.\n\n
+          b) A02BC: En 2012 toma cierta relación con 6144.\n\n")
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0952) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.1218) es menor a la 'regla gorda' que indica que 
+          si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANALISIS: En este caso la inercial (0.0844) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANALISIS: En este caso la inercial (0.1184) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 23.648,9 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 23.648 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 16.556.8 con 30 grados de libertad. Según las tablas 
+            de Chi^2 X^2[0.05](30) = 43,75. Como 16.556 >> 44 debería haber suficiente evidencia en contra de 
+            que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables, aunque como hay una 
+            fila que tiene menos de 5 elementos no puede afectar al resultado.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 21.398,12 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 21.398 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 16.675.2 con 30 grados de libertad. Según las tablas 
+            de Chi^2 X^2[0.05](30) = 43,75. Como 16.556 >> 44 debería haber suficiente evidencia en contra de 
+            que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables, aunque como hay una 
+            fila que tiene menos de 5 elementos no puede afectar al resultado.\n\n")
     }
   }
   
   #Contribución de la Dimensión
   if (funcion == "E") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.\n\n")
+      cat("\t\tNOTA TEORÍA: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.\n\n")
+      cat("\t\tNOTA TEORÍA: La línea roja marca la contribución media esperada. Si la contribución de filas/columnas fueran uniforme, el valor esperado sería (en %) 1/número de filas de la matriz. Para tres filas sería 1/3 = 33%. Para cualquier dimensión, una fila/columna con una contribución mayor que este límite podría ser considerada como importante en la contribución a esa dimensión.\n\n")
     }
   }
   
   #Gráfico Simétrico
   if (funcion == "F") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se observa que la relación entre los grupos de ATCs que se podían visualizar en el gráfico de mosaico se ven representadas.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Se observa que el ATC N05AL que no tiene valores en 5424 y en 6144 y muy poquitos en 
+          7071 (14 para ser exactos) está muy lejos del resto de ATCs. Por otro lado, se puede observar que hay varios 
+          códigos de ATC muy cercanos entre sí: Nxxxx.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar visiblemente el cambio detallado en el gráfico de mosaico. 
-          La familia ATC B ha cambiado de cuadrante en la gráfica y la familia S está más cerca del (0,0).\n\n")
+      cat("\t\tNOTA ANÁLISIS: El principal cambio que se observa en el gráfico es que el J01CR ha cambiado de 
+          cuadrante acercándose al M01AE. Los ATCs NXXXX están más próximos entre sí.\n\n")
     }
   }
   
@@ -666,19 +678,14 @@ pintaNotaAnalisis_A1 <- function(funcion, anyo, i, j) {
           (en el otro eje), representa que la frecuencia es muy inferior a lo esperado.\n\n")
       cat("\t\tNOTA ANÁLISIS: Se puede observar que se reproduce lo que se esperaba después de la visualización
           del gráfico de mosáico.\n\n")
-      cat("\t\ta) Los ATCs que están más asociados al 6144 son C, G y S. El ATC B también.\n\n
-          b) Los ATCs que están más asociados al 5424 son los A y M. Le siguen D y H.\n\n
-          c) Los ATCs que está más asociados con el 7071 son R y B.\n\n")
+      cat("\t\ta) Los ATCs que están más asociados al 6144 son B01AC, C09AA y C08AA.\n\n
+          b) Los ATCs que están más asociados al 5424 son M01AE y A10AE..\n\n
+          c) Los ATCs que está más asociados con el 7071 son NXxx, A02BC y M02AA.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar que en este gráfico también se ven visibles los elementos 
-          que se diferenciaban en el gráfico de mosaico. Además de los ya comentados de la familia S y B
-          también se encuentran los otros cambios que se observaban:\n\n")
-      cat("\t\ta) La familia H está más asociada con el CRG-base 5424 que en 2011.\n\n
-          b) La familia G tiene una asociación menos fuerte con el CRG-base 6144 que en 2011.\n\n
-          c) Los ATCs que está más asociados con el 7071 son R y B.\n\n")
-      
+      cat("\t\tNOTA ANÁLISIS: A parte del cambio del ATC J01CR, el otro cambio que se observa es una pequeña 
+          variación en el ángulo del 5424.\n\n")
     }
   }
 }
@@ -687,65 +694,56 @@ pintaNotaAnalisis_A2 <- function(funcion, anyo, i, j) {
   #Dimensionalidad
   if ( funcion == "A") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar, a diferencia con la matriz de suma de dispensaciones, que ahora sí 
-          que hay valores por debajo de 5 elementos en la tabla de contingencia. El valor de L para 5424 es de 2. Como 
-          decíamos en el apartado anterior, esto hará que el método de Chi^2 pudiera generar error.\n\n
-          TO-DO: Pendiente de revisar dos líneas de acción: Ejecutar Chi^2 sumando L+V y/o ejecutar método de Fisher.")
+      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que para el medicamento N05AL hay valores a 0. 
+          Esto nos va a afectar a la hora de invocar al método de Chi^2. TO-DO: ¿Utilizamos el método Fisher?.")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como ocurría en 2011, la tabla de contingencia tiene valores muy pequeños para la existencia 
-          de medicamentos L y V. Vamos a tener el mismo problema puesto que cuando se ejecute el método de Chi^2 
-          nos saldrá que puede arrojar valores pocos precisos.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En la tabla de contingencia se observa que para el medicamento N05AL hay valores a 0. 
+          Esto nos va a afectar a la hora de invocar al método de Chi^2. TO-DO: ¿Utilizamos el método Fisher?.")
     }
   }
   
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Como primer vistazo se puede identificar que el gráfico es bastante distinto con respecto al de 2011 en suma:\n\n")
-      cat("a) La familia H presenta menos asociación con el CRG-base 6144.\n\n")
-      cat("b) Las familias D y J no se asocian ahora a el CRG-base 6144 y la asociación con el CRG-base 7071 es más débil.\n\n")
-      cat("c) La familia A mantiene la asociación con el CRG-base 6144 y la asociación de la familia H es más débil a ese CRG-base.\n\n")
-      cat("d) La familia C mantiene la asociación con el CRG-base 6144.\n\n")
-      cat("e) La familia G no se asocia al CRG-base 6144 y pasa a asociarce al CRG-base 7071.\n\n")
-      cat("f) La familia B con respecto a 2011 pasa a asociarse al CRG-base 6144.\n\n")
-      cat("g) La familia R tiene una relación de asociación menor al CRG-base 7071.\n\n
-          En definitiva, las relaciones de asociación presentan cambios con respecto a hacer una reducción de la matriz de 
-          suma de disposiciones o de ocurrencia. Las relaciones más fuertes cuando se habla de ocurrencia son para la 
-          familia H (con el CRG-base 7071), de la familia A (con el CRG-base 5424) y de la familia C (con el CRG-base 6144).\n\n")
+      cat("\t\tNOTA ANÁLISIS: Como primer vistazo se puede identificar que el gráfico genera diferente asociación por frecuencias 
+          entre los ATCs y los CRG-base. Predomina mucho menos el color rojo habiendo más celdas con valores 
+          dentro de una frecuencia esperada. El ATC que más cambio representa es el C10AA que ahora solo 
+          aparece asociado al 5424 y no muy intensamente.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Igual que ocurría cuando estábamos viendo la alternativa anterior, se puede observar 
-          algunas pequeñas diferencias entre los años 2011 y 2012. Lo más llamativo es que aparece una asociación débil 
-          de la familia N con el CRG-base 7071. La asociación de la familia M pierde intensidad tanto con el CRG-base 5424 
-          como con el CRG-base 6144.\n\n
-          Pero de carácter general las reglas de asociación no son muy distintas al año 2011.\n\n")
+      cat("\t\tNOTA ANÁLISIS: ATC A02BC se relaciona con algo más de intensidad con el CRG-base 6144 que en 2011. El 
+          otro cambio es que el J01CR solo se relaciona con el 5424.\n\n")
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0277) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.1113) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0273) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.115) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 709.7 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 709 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
-          Nótese que como decíamos antes, este valor puede no ser correcto.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 2.697,7 con 30 grados de libertad. Según las tablas 
+          de Chi^2 X^2[0.05](30) = 43,73. Como 2.697 >> 43 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de \n\n
+            que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables, aunque como hay una 
+            fila que tiene menos de 5 elementos no puede afectar al resultado.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 704.9 con 26 grados de libertad. Según las tablas de Chi^2 X^2[0.05](26) = 38,8851. Como 704 >> 38 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
-          Nótese que como decíamos antes, este valor puede no ser correcto.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 2.766,3 con 30 grados de libertad. Según las tablas 
+          de Chi^2 X^2[0.05](30) = 43,73. Como 2.766 >> 43 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de \n\n
+            que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables, aunque como hay una 
+            fila que tiene menos de 5 elementos no puede afectar al resultado.\n\n")
     }
   }
   
@@ -763,29 +761,24 @@ pintaNotaAnalisis_A2 <- function(funcion, anyo, i, j) {
   #Gráfico Simétrico
   if (funcion == "F") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se observa que el gráfico de ocurrencia cambia con respecto al gráfico de suma de dispensaciones, reflejando los movimientos 
-          que se había identificado en el gráfico de mosáico.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Se observa que el ATC J01CR ha cambiado de cuadrante pasando a estar en el mismo 
+          cuadrante que el 5424. En general se observan que los ATCs Nxxx y Rxxx están muy próximos por lo que se 
+          visualiza más la relación entre ellos.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se observa que la relación entre los grupos de ATCs que se podían visualizar en el gráfico de mosaico se ven representadas.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No se observa que haya diferencias con respecto a 2011.\n\n")
     }
   }
   
   #Gráfico Asimétrico
   if (funcion == "G") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En el gráfico asimétrico se puede observar las siguientes relaciones de asociación:\n\n
-          a) CRG-base 5424: Familias M y A.\n\n 
-          b) CRG-base 6144: Familias C.\n\n
-          c) CRG-base 7071: Familias N, R, D.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Se observa lo mismo que en la gráfica simétrica.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como anticipábamos antes, en el gráfico asimétrico se puede observar las siguientes relaciones de asociación:\n\n
-          a) CRG-base 5424: Familias M y A.\n\n 
-          b) CRG-base 6144: Familias C.\n\n
-          c) CRG-base 7071: Familias N, R, D.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No se observa diferencias con respecto a 2011.\n\n")
       
     }
   }
@@ -808,41 +801,38 @@ pintaNotaAnalisis_B1 <- function(funcion, anyo, i, j) {
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este gráfico se puede observar como hay una regla de asociación muy fuerte 
-          entre las columnas y las filas de la tabla de contingencia.\n\n
-          TO-DO: Revisar este resultado con el resultado del MAC y de la Edad con los ATCs para revisar si 
-          esta 'asociación' tiene que ver con la inversión de Sexo a partir de los 70 años.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este gráfico se observa que hay una mayor asociación en el Sexo 2 con aquellos 
+          ATCs que están más asociados, según vimos antes, al grupo CRG-base 7071. En cambio el Sexo 1 está más 
+          relacionado con el grupo CRG-base 5424 y 6144.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Al igual que ocurría en 2011, se puede observar como hay una regla de asociación muy fuerte 
-          entre las columnas y las filas de la tabla de contingencia.\n\n
-        TO-DO: Revisar este resultado con el resultado del MAC y de la Edad con los ATCs para revisar si 
-          esta 'asociación' tiene que ver con la inversión de Sexo a partir de los 70 años.\n\n")
+      cat("\t\tNOTA ANÁLISIS: El principal cambio entre 2011 y 2012 que se observa es para el ATC C08CA que en 
+          2011 parece que tiene más frecuencia relativa a lo esperado con el Sexo 2 y en 2012 es con el Sexo 2.\n\n")
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.013) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0178) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0186) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0227) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 10.500,4 con 13 grados de libertad. Según las tablas de Chi^2 X^2[0.05](13) = 22,3620. Como 10.500 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 6.616,7 con 15 grados de libertad. Según las tablas de Chi^2 X^2[0.05](15) = 22,3071. Como 6.616 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
           Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
           una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 13.573,6 con 13 grados de libertad. Según las tablas de Chi^2 X^2[0.05](13) = 22,3620. Como 13.573 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 7.937,5,6 con 15 grados de libertad. Según las tablas de Chi^2 X^2[0.05](15) = 22,3071. Como 7.973 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
           Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
           una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
     }
@@ -917,41 +907,36 @@ pintaNotaAnalisis_B2 <- function(funcion, anyo, i, j) {
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se pueden observar que en Ocurrencia ciertas frecuencias cambian de forma visible con 
-          respecto al mosaico de suma de dispensaciones. Los cambios son los siguientes:\n\n
-          a) Las familias N y B presentan una asociación menos fuerte aunque mantiene la proporción entre ambos sexos de más o menos frecuentes.\n\n
-          b) Las familias M, V, L, R y G pasan a no presentar una asociación, es decir, mantienen frecuencias dentro de lo esperado en una distribución aleatoria.\n\n
-          c) La familia J invierte la proporción, es decir, ahora presenta mayor frecuencia de lo esperado en el Sexo 2 (en el mosaico de suma lo hacía en el Sexo 1) 
-          aunque la asociación es menos fuerte.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Si comparamos a la suma de dispensaciones, se observan varios cambios:\n\n
+          a) Los ATCs R05CB, J01CR, A02BC, M01AE y C08CA pierde la significancia en relación al sexo.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Solo se observa un cambio con respecto al mosaico de ocurrencia en 2012. La familia 
-            N presenta una asociación más fuerte.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No se observa cambio con respecto a 2011.\n\n")
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0086) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0167) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.01) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0176) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 418,4 con 13 grados de libertad. Según las tablas de Chi^2 X^2[0.05](13) = 22,3620. Como 418 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 766,8 con 15 grados de libertad. Según las tablas de Chi^2 X^2[0.05](15) = 22,3620. Como 766,8 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
           Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
           una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 530,9 con 13 grados de libertad. Según las tablas de Chi^2 X^2[0.05](13) = 22,3620. Como 530 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 875,9 con 15 grados de libertad. Según las tablas de Chi^2 X^2[0.05](15) = 22,3620. Como 875 >> 22 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
           Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
           una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
     }
@@ -1008,63 +993,43 @@ pintaNotaAnalisis_C1 <- function(funcion, anyo, i, j) {
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Si visualizamos la información del gráfico, por rango de Edad se tiene la siguiente información:\n
-          a) R1 [0, 49) -> Familias con asociación positiva: J, H, M, A y D.\n
-          b) R2 [49, 55) -> Familias con asociación positiva: M,A,C,V.\n
-          c) R3 [55, 59) -> Familias con asociación positiva: M,A,C,L.\n
-          d) R4 [59, 63) -> Familias con asociación positiva: S,G,M,A,C,L.\n
-          e) R5 [63, 68) -> Familias con asociación positiva: S,G,M,A,C. La familia A pierde intensidad en la asociación.\n
-          f) R6 [68, 78) -> Familias con asociación positiva: S,G,B,R,D,V.\n
-          h) R7 [78, 103] -> Familias con asociación positiva:J,H,B,R,N,D,V.\n\n
-          A primera vista parece que la relación de las familias M y A pierden intensidad conforme avanza la edad,
-          hasta desaparecer.\n
+      cat("\t\tNOTA ANÁLISIS: Se observa que conforme aumenta la edad, toman fuerza relaciones con ATCs más asociados al grupo 7071.n:\n
           Nótese que lo que indico es la parte 'azul', es decir, aquello donde hay más frecuencia de la esperada.\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Si comparamos con 2011 vemos que los patrones más o menos coinciden con algunas diferencias:\n
-          a) R1 [0, 49) -> La asociación de la familia J es menos intensa.\n
-          b) R2 [49, 55) -> Aparece una asociación con la familia H que en 2011 no había en positivo.\n
-          c) R3 [55, 59) -> No se observan cambios.\n
-          d) R4 [59, 63) -> En 2012 no aparecen relaciones positivas para las familias S y G.\n
-          e) R5 [63, 68) -> En 2012 no aparecen relaciones positivas con la familia A.\n
-          f) R6 [68, 78) -> En 2012 si aparece una relación positiva con la familia H.\n
-          g) R7 [78, 103) -> En 2012 no aparece una relación positiva con la familia H. \n\n
-          TO-DO: Habría que chequear si la situación de cambios de familia de medicamentos está relacionada con el 
-          copago que se inició en 2012.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Si comparamos con 2011 vemos que el cambio más significativo (que es poco) tenemos.\n\n") 
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0215) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0621) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0243) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0677) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 17.362,6 con 78 grados de libertad. Según las tablas de Chi^2 X^2[0.05](70) = 90,53. Como 17.362 >> 90 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 23.054,15 con 90 grados de libertad. Según las tablas de Chi^2 X^2[0.05](90) = 124,3421. Como 23.054 >> 124 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 17.689,6 con 78 grados de libertad. Según las tablas de Chi^2 X^2[0.05](70) = 90,53. Como 17.689 >> 90 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 23.705,6 con 90 grados de libertad. Según las tablas de Chi^2 X^2[0.05](90) = 124,3421 Como 23.705 >> 90 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
     }
   }
   
   #Contribución de la Dimensión
   if (funcion == "E") {
     if (anyo == 2011) {
-#      cat("\t\tNOTA ANÁLISIS: Parece que se tiene con dos dimensiones una epxlicación total de la dimensionalidad.\n\n")
     }
     
     if (anyo == 2012) {
-#      cat("\t\tNOTA ANÁLISIS: .\n\n")
     }
   }
   
@@ -1074,52 +1039,37 @@ pintaNotaAnalisis_C1 <- function(funcion, anyo, i, j) {
       cat("\t\tNOTA ANÁLISIS: Estos gráficos sirven para comparar los propios elementos de filas y columnas entre sí. 
           A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
           a) R1 \n
-          b) R2, R3, R4 y R5 parece que no están muy lejos entre sí; en concreto R4 y R5 están situados muy cerca.\n 
+          b) R2 y R3 parece que no están muy lejos entre sí.\n 
+          c) R4 y R5 parece que no están muy lejos entre sí.\n
           c) R6 \n
           d) R7 \n
-          A nivel de filas (ATCs) se puede observar lo siguiente:
-          a) Las familias B, N, D, V parece que están en un cluster.\n
-          b) Las familias J, H parece que están en un cluster.\n
-          c) Las familias S, G, R, L y P están separadas del resto.\n
-          d) Las familias A, C, y M parece que tienen cierta relación entre sí.\n\n")
+          A nivel de filas (ATCs) no hay grupos claros.
+          a) N02BE y J01CR parece que están en un cluster.\n
+          b) R05CB y M02AA parece que están en un cluster.\n
+          c) C08CA y B01AC parece que están separadas del resto.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Como se anticipaba en el gráfico de mosáico, se puede observar una diferencia en el comportamiento 
-            de la toma de ATCs (número total de dispensaciones). A nivel de rango de edades parece que tenemos 
-            tres clusters:\n
+      cat("\t\tNOTA ANÁLISIS: Comparando con 2011 se tienen los siguientes:\n
+          A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
           a) R1 \n
-          b) R2, R3, R4 y R5 parece que no están muy lejos entre sí; en concreto R4 y R5 están situados muy cerca.\n 
-          c) R6 y R7 \n
-          A nivel de filas (ATCs) se puede observar lo siguiente:
-          a) Las familias B, N, S, G parece que están en un cluster. D y V se alejan de las familias B y N.\n
-          b) Las familias R, D y J parece que están en un cluster.\n
-          c) La familia V se queda más alejada del resto de clusters.\n
-          d) Las familias C se queda más alejeda de la familia A y M. 
-          e) Las familias A, M, L y P parece que forman un clusters.\n
-          f) La familia H parece que se queda más alejada del resto de clusters.\n\n")
+          b) R2 y R3 parece que no están muy lejos entre sí.\n 
+          c) R4 y R5 parece que no están muy lejos entre sí. R4 no parece claro si cae cerca de R2 o de R3.\n
+          c) R6 \n
+          d) R7 \n
+          A nivel de filas (ATCs) no hay grupos claros.
+          a) N02BE y J01CR ya no están en el cluster.\n
+          b) R05CB y M02AA parece que están en un cluster. Ahora están muy cercas de N02BE.\n
+          c) C08CA y B01AC parece que están separadas del resto.\n\n")
     }
   }
   
   #Gráfico Asimétrico
   if (funcion == "G") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R7 parece estar muy relacionado con las familias B, V y N.\n
-          b) R6 parece estar muy relacionado con la familia S.\n
-          c) R5 parece estar muy relacionado con la familia C.\n
-          d) R3, R4 y R5 parecen estar muy relacionados con la familia M.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R7 parece estar muy relacionado con las familias N, G, R y en algo de menor medida con B.\n
-          b) R6 parece estar muy relacionado con la familia N, G, y en algo de menor medida B y R.\n
-          c) R2, R3, R4 y R5 parece estar muy relacionado con la familia C.\n
-          d) R2 parece estar muy relacionado también con A y M. Con algo menos de intensidad le pasa lo mismo a R3.\n
-          Como se había anticipado en el gráfico de mosaico parece que en 2012 ha ocurrido un cambio en el número de dispensaciones 
-          de las familias ATC.\n\n
-          TO-DO: Chequear si en 2012 hubo algún medicamento nuevo sobre la diabetes.")
     }
   }
 }
@@ -1141,191 +1091,58 @@ pintaNotaAnalisis_C2 <- function(funcion, anyo, i, j) {
   #Mosaico.
   if ( funcion == "B") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Si visualizamos la información del gráfico, por rango de Edad se tiene la siguiente información:\n
-          a) R1 [0, 49) -> Familias con asociación positiva: H, A. Con respecto a suma de disposición no aparece asociación con J, M y D.\n
-          b) R2 [49, 55) -> Familias con asociación positiva: M,A,C. Con respecto a suma de disposición no aparece asociación con V.\n
-          c) R3 [55, 59) -> Familias con asociación positiva: A, C. Con respecto a suma de disposición no aparece asociación con M,L.\n
-          d) R4 [59, 63) -> Familias con asociación positiva: C. Con respecto a suma de disposición no aparece asociación con S,G,M,A,C,L.\n
-          e) R5 [63, 68) -> Familias con asociación positiva: Ninguna. Con respecto a suma de disposición no aparece asociación con S,G,M,A,C.\n
-          f) R6 [68, 78) -> Familias con asociación positiva: G, S, B, D, V. Con respecto a suma de dispensación no aparece asociación con R.\n
-          h) R7 [78, 103] -> Familias con asociación positiva:J, S, B, D, V. Con respecto a suma de dispensaciones no aparece asociación con H,R,N.\n\n
-          Nótese que lo que indico es la parte 'azul', es decir, aquello donde hay más frecuencia de la esperada.\n")
+      cat("\t\tNOTA ANÁLISIS: El cambio con respecto a la suma de disposiciones es visible. Tiene menos celdas rojas. Pero no hay grandes cambios en la parte de azul.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Si comparamos con 2011 vemos que los patrones más o menos coinciden con algunas diferencias:\n
-          a) R1 [0, 49) -> En 2012 no aparece asociación con la familia J.\n
-          b) R2 [49, 55) -> Aparece una asociación con la familia H que en 2011 no había en positivo.\n
-          c) R3 [55, 59) -> No se observan cambios.\n
-          d) R4 [59, 63) -> En 2012 no aparecen relaciones positivas para las familias S y G.\n
-          e) R5 [63, 68) -> En 2012 no aparecen relaciones positivas con la familia A.\n
-          f) R6 [68, 78) -> En 2012 si aparece una relación positiva con la familia H.\n
-          g) R7 [78, 103) -> En 2012 no aparece una relación positiva con la familia H. \n\n
-          TO-DO: Habría que chequear si la situación de cambios de familia de medicamentos está relacionada con el 
-          copago que se inició en 2012.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Con respecto a 2011 se observan pequeñas variaciones en relación a la intensidad.:\n\n")
     }
   }
   
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0168) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0441) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0193) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0518) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
     }
   }
   
   #Test de CHI^2
   if (funcion == "D") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 815.9 con 78 grados de libertad. Según las tablas de Chi^2 X^2[0.05](70) = 90,53. Como 815 >> 90 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 2.029,0199 con 90 grados de libertad. Según las tablas de Chi^2 X^2[0.05](90) = 124,321. Como 2.029 >> 124 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 1.024,5 con 78 grados de libertad. Según las tablas de Chi^2 X^2[0.05](70) = 90,53. Como 1.024 >> 90 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 2.572,6 con 90 grados de libertad. Según las tablas de Chi^2 X^2[0.05](90) = 124,321. Como 2.572 >> 124 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
     }
   }
   
   #Contribución de la Dimensión
   if (funcion == "E") {
     if (anyo == 2011) {
- #     cat("\t\tNOTA ANÁLISIS: Parece que solo hay una dependencia.\n\n")
     }
     
     if (anyo == 2012) {
- #∫     cat("\t\tNOTA ANÁLISIS: .\n\n")
     }
   }
   
   #Gráfico Simétrico
   if (funcion == "F") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Estos gráficos sirven para comparar los propios elementos de filas y columnas entre sí. 
-          A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R1 \n
-          b) R2, R3 parece que no están muy lejos entre sí; R4 y R5 están situados muy cerca pero visualmente parece que son otro cluster.\n 
-          c) R6 \n
+      cat("\t\tNOTA ANÁLISIS: Sí que se observan cambios con respecto a 2011:\n
+          a) R1. En este cuadrante aparece J01CR.\n
+          b) R2, R3 y R4 están juntos en el cuadrante.\n 
+          c) R5 y R6 ahora están en cuadrantes distintos. R6 pasa al cuadrante del R7.\n
           d) R7 \n
-          A nivel de filas (ATCs) se puede observar lo siguiente:
-          a) Las familias L y B aunque están cerca del cluster J, R, N visualmente parecen distintos.\n
-          b) Las familias J, R y N parece que están en un cluster.\n
-          c) Las familias S, G parece que están en un cluster.\n
-          d) La familia V, H y P estás separada del resto.\n
-          e) Las familias A, M y C parecen separadas del resto también.\n\n")
+          A nivel de filas (ATCs) también se observan algunos pequeños cambios con respecto al total de dispensaciones.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Estos gráficos sirven para comparar los propios elementos de filas y columnas entre sí. 
-          A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R1 \n
-          b) R2, R3 parece que no están muy lejos entre sí; R4 y R5 están situados muy cerca pero visualmente parece que son otro cluster.\n 
-          c) R6 y R7 parecen que forman un mismo cluster. \n
-          A nivel de filas (ATCs) se puede observar lo siguiente:
-          a) Las familias D, R, N y J parecen estar en el mismo cluster.\n
-          b) Las familias L y C parecen que están en un cluster.\n
-          c) Las familias M y A parecen que están en un cluster.\n
-          d) La familia B y S parecen que están en un cluster.\n
-          e) Las familias P y H parecen que están en un cluster.\n
-          f) Las familias G y V parecen que están separadas del resto.\n\n")
-    }
-  }
-  
-  #Gráfico Asimétrico
-  if (funcion == "G") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R7 parece estar muy relacionado con las familias R y G. Con las familias N, S y D también parece tener relación.\n
-          b) R6 parece estar muy relacionado con la familia N, R, S y G.\n
-          c) R5 parece estar relacionado con la familia N.\n
-          d) R2 parece estar muy relacionado con la familia M. En menor medida con A y C.\n
-          e) R3 parece estar relacionado con las familias M y C.\n 
-          f) R4 parece estar muy relacionados con la familia C y en menor medida con la M.\n
-          g) R1 parece estar relacionado con la familia P y en menor medida con la A.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: A nivel de columnas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R7 parece estar muy relacionado con las familias R, N, S y D.\n
-          b) R6 parece estar muy relacionado con la familia R, N, V y D y en algo de menor medida S.\n
-          c) R5 parece estar muy relacionado con la familia N y L.\n
-          d) R4 parece estar muy relacionado también con C. Con algo menos de intensidad le pasa lo mismo a R3.\n
-          e) R3 y R2 parece estar relacionadas con C y M.\n
-          f) R1 parece estar relacionado con P, H y en menor medida con A.\n\n
-          TO-DO: Chequear si en 2012 hubo algún medicamento nuevo sobre la diabetes.")
-    }
-  }
-}
-
-pintaNotaAnalisis_D <- function(funcion, anyo, i, j) {
-  #Dimensionalidad
-  if ( funcion == "A") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como se puede observar en la tabla de contingencia, todos los elementos
-           tienen más de 5 por lo que no debería haber problemas luego cuando se ejecute el método de Chi^2.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como se puede observar en la tabla de contingencia, todos los elementos
-           tienen más de 5 por lo que no debería haber problemas luego cuando se ejecute el método de Chi^2.\n\n")
-    }
-  }
-  
-  #Mosaico.
-  if ( funcion == "B") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se observa una mayor dependencia del Sexo_1 con el grupo 5424 y como va invirtiéndose a través del CRG-base.
-          En realidad lo que está reflejando es una relación indirecta, ya que como hay una relación entre el grupo y la edad, y hay otra entre
-          la edad y el sexo (por la esperanza de la vida). \n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se refleja lo mismo, pero parece que hay una intensidad menor en la asociación entre el Sexo 1 y el grupo CRG-base 6144. \n\n")
-    }
-  }
-  
-  #Test de Inercia
-  if (funcion == "C") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.022) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.0167) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
-    }
-  }
-  
-  #Test de CHI^2
-  if (funcion == "D") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 119.8 con 3 grados de libertad. Según las tablas de Chi^2 X^2[0.05](3) = 7,81. Como 119.3 >> 7,81 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
-          Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
-          una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 99.1 con 3 grados de libertad. Según las tablas de Chi^2 X^2[0.05](3) = 7,81. Como 99 >> 7,81 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n
-          Nótese que el método indica que hay dependencia entre las variables, pero, como solo se muestra 
-          una única dimensión ahí nos quedamos. Para este caso, el Test de Mainvaud's también indica que hay dependencia.\n\n")
-    }
-  }
-  
-  #Contribución de la Dimensión
-  if (funcion == "E") {
-    if (anyo == 2011) {
-    }
-    
-    if (anyo == 2012) {
-    }
-  }
-  
-  #Gráfico Simétrico
-  if (funcion == "F") {
-    if (anyo == 2011) {
-    }
-    
-    if (anyo == 2012) {
+      cat("\t\tNOTA ANÁLISIS: Con respecto a 2011 se observan pequeñas variaciones, la más significativa es el ATC N05AL que cambia de cuadrante.\n\n") 
     }
   }
   
@@ -1335,101 +1152,6 @@ pintaNotaAnalisis_D <- function(funcion, anyo, i, j) {
     }
     
     if (anyo == 2012) {
-    }
-  }
-}
-
-pintaNotaAnalisis_E <- function(funcion, anyo, i, j) {
-  #Dimensionalidad
-  if ( funcion == "A") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como se puede observar en la tabla de contingencia, todos los elementos
-          tienen más de 5 por lo que no debería haber problemas luego cuando se ejecute el método de Chi^2.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como se puede observar en la tabla de contingencia, todos los elementos
-          tienen más de 5 por lo que no debería haber problemas luego cuando se ejecute el método de Chi^2.\n\n")
-    }
-  }
-  
-  #Mosaico.
-  if ( funcion == "B") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar como conforme va aumentando el rango de edad la frecuencia con respecto a la 
-          esperada se va desplazando también hacia abajo.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se observa el mismo comportamiento que en 2011.\n\n")
-    }
-  }
-  
-  #Test de Inercia
-  if (funcion == "C") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.1986) es menor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (0.2047) es mayor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa. Es decir, parece que hay una 
-          correlación significativa.\n\n")
-    }
-  }
-  
-  #Test de CHI^2
-  if (funcion == "D") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 1.074,5 con 12 grados de libertad. Según las tablas de Chi^2 X^2[0.05](12) = 21,02. Como 1.074,5 >> 21,02 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tenemos un estadístico de 1.206,2 con 12 grados de libertad. Según las tablas de Chi^2 X^2[0.05](12) = 21,02. Como 1.206,2 >> 21,02 (además se tiene un p-value de 0)  hay suficiente evidencia en contra de que la hipótesis nula sea cierta. Es decir, hay dependencia entre las variables.\n\n")
-    }
-  }
-  
-  #Contribución de la Dimensión
-  if (funcion == "E") {
-    if (anyo == 2011) {
-    }
-    
-    if (anyo == 2012) {
-    }
-  }
-  
-  #Gráfico Simétrico
-  if (funcion == "F") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Estos gráficos sirven para comparar los propios elementos de filas y columnas entre sí. 
-          A nivel de filas (Rango de Edad) se puede observar lo siguiente:\n
-          a) R1 \n
-          b) R2, R3 parece que no están muy lejos entre sí.\n 
-          c) R5, R6 parece que forman parte del mismo cluster.\n
-          d) R4 parece que está a caballo entre R2, R3 y R5, R6.\n
-          e) R7 está solo.\n
-          A nivel de columnas (CRGs) se puede observar lo siguiente:
-          a) Las tres variables son independientes.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: El gráfico es muy parecido al gráfico del 2011. La diferencia más sutil es 
-          que R3 se aleja un poco del grupo 6144.\n\n")
-    }
-  }
-  
-  #Gráfico Asimétrico
-  if (funcion == "G") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: A simple vista se puede ver que:. 
-          a) R1 tiene mucha asociación con el CRG-base 5424.\n
-          b) R4 es el que tiene mayor asociación con 6144. R5 y R6 también aunque con menor intensidad.\n 
-          c) R3 se encuentra más asociado al CRG-base 6144 que al CRG-base 5424.\n
-          d) R2 se encuentra más asociado al CRG-base 5424, aunque también se asocia al 6144.\n
-          e) R7 está más asociado al CRg-base 7071 aunque con una intensidad baja.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar un comportamiento muy parecido al del 2011.\n\n")
     }
   }
 }
@@ -1451,7 +1173,7 @@ pintaNotaAnalisis_F <- function(funcion, anyo, i, j) {
   #Test de Inercia
   if (funcion == "C") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (1.375) es mayor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa. Es decir, parece que hay una 
+      cat("\t\tNOTA ANÁLISIS: En este caso la inercial (1.3333) es mayor a la 'regla gorda' que indica que si es > 0.2 hay mucha significancia estadística para indicar que hay una correlación significativa. Es decir, parece que hay una 
           correlación significativa.\n\n")
     }
     
@@ -1467,7 +1189,7 @@ pintaNotaAnalisis_F <- function(funcion, anyo, i, j) {
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En 2016 sigue haciendo falta 16 dimensiones para explicar el 80% de la varianza.\n\n")
+      cat("\t\tNOTA ANÁLISIS: En 2012 sigue haciendo falta 16 dimensiones para explicar el 80% de la varianza.\n\n")
     }
   }
   
@@ -1475,27 +1197,22 @@ pintaNotaAnalisis_F <- function(funcion, anyo, i, j) {
   if (funcion == "E") {
     if (anyo == 2011) {
       cat("\t\tNOTA ANÁLISIS: En este gráfico se representan las variables. Como ocurría con el AC en teoría 
-          solo sirve para poder comparar entre las distintas variables. Lo primero que se intuye es que parece 
+          solo sirve para poder comparar entre las distintas variables. 
+          Lo primero que se intuye es que parece 
           que el grupo 5424 no se relaciona con ningún elemento de ocurrencia de medicamento y sin embargo, se
-          relaciona mucho con el rango de edad R1 y con algo de menor intensidad con R2.\n
+          relaciona mucho con el rango de edad R1.\n
           \n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Comparando el gráfico con el resultado de 2011 se pueden apreciar ciertas diferencias 
-          que merece la pena analizar más adelante:
-          a) V_1 parece que tiene un comportamiento diferente en 2012 con respecto a 2011.\n
-          b) G_1 parece que tiene un comportamiento diferente en 2012 con respecto a 2011.\n
-          c) A_0 tiene un comportamiento diferente pero porque en 2012 hay más elementos a 0 que en 2011.\n\n")
     }
   }
   
   #Gráfico Simétrico - No existencia de ATCs con Rango y CRG.
   if (funcion == "F")  {
     if (anyo == 2011)  {
-      cat("\t\tNOTA ANÁLISIS: Se observa que los valores de no ocurrencia para las familias que más relacionadas están con 
-          5424 son: A, C, B. N también, pero en mucha menor medida. No hay ninguna familia que la no ocurrencia esté especialmente 
-          cerca del 6144 y del 7071.\n\n")                                                                                                                                                           
+      cat("\t\tNOTA ANÁLISIS: Se observa que el CRG-base 5424 aparece más relacionado con la no toma de los distintos ATCs. 
+        El grupo 6144 parece estar más relacionado con la no toma del ATC A10AE. El grupo 7071 está poco relacionado con la no toma de ATCs.\n\n")
     }
     
     if (anyo == 2012) {
@@ -1506,40 +1223,23 @@ pintaNotaAnalisis_F <- function(funcion, anyo, i, j) {
   #Gráfico Simétrico - Si existencia de ATCs con Rango y CRG.
   if (funcion == "G") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar que 6144 está muy cerca de C y de B. Con el 7071 teniendo en cuenta la 
-          proporción de elementos tiene cierta relación con H, B, N, R.\n\n")
+      cat("\t\tNOTA ANÁLISIS: Se puede observar que 5424 está muy relacionado con la toma de A10AE. El grupo 6144 está 
+        más relacionado con la toma de C08CA, C09CA, C10AA, B01AC y A10BA. El grupo 7071 con el resto.\n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Tal y como se adelantaba en el gráfico simétrico, se observa diferencia en V_1 y G_1 
-          También se ve alguna pequeña diferencia en P_1.\n\n")
-    }
-  }
-  
-  #Gráfico Simétrico - Si existencia de Rango y CRG.
-  if (funcion == "H") {
-    if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar que 5424 está muy cerca del R1. R2 y R3 ya está con menor intensidad.\n
-            El grupo 6144 está más relacionado con los R3 al R6, aunque con ninguno mantiene una relación especialmente intensa. \n
-            El grupo 7071 tiene una mayor relación con el R7.\n\n")
-    }
-    
-    if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Se puede observar como el R7 tiene un cambio en el comportamiento, estando más cerca de 6144. Pero, 
-          como 7071 está más bajo también, no me queda claro si se acerca más a 6144 o simplemente es consecuencia de la bajada 
-          de 7071.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No hay diferencias visuales en 2012 con respecto 2011.\n\n")
     }
   }
   
   #Gráfico Simétrico - No existencia de ATC y Rango
   if (funcion == "I") {
     if (anyo == 2011) {
-      cat("\t\tNOTA ANÁLISIS: En general la no toma de medicamentos no está muy relacionada con la Edad.
-          Cuanto mayor sea la edad menos probabilidad de no tomar medicamentos. \n\n")
+      cat("\t\tNOTA ANÁLISIS: En general la no toma de medicamentos parece estar relacionada con la edad. \n\n")
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: En esta gráfica también es visible el cambio en el R7. También se ve un pqueño cambo en R1 con respecto a C_0.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No hay diferencias en relación a 2011.\n\n")
     }
   }
   
@@ -1552,7 +1252,7 @@ pintaNotaAnalisis_F <- function(funcion, anyo, i, j) {
     }
     
     if (anyo == 2012) {
-      cat("\t\tNOTA ANÁLISIS: Aquí se observan los cambios ya comentados de V_1, G_1 y de R7.\n\n")
+      cat("\t\tNOTA ANÁLISIS: No hay diferencias en relación a 2011.\n\n")
     }
   }
   
@@ -1711,24 +1411,23 @@ getRangoEdad <- function(csv, anyo) {
 getOrdenacion <- function(ac, anyo) {
   v <- c()
   if ( ac == "A.1" | ac == "A.2") {
-    if (anyo == 2011) v <- c(6, 4, 7, 1, 9, 3, 5, 13, 10, 2, 12, 8, 11, 14)  
-    #if (anyo == 2012) v <- c(6, 4, 7, 1, 9, 3, 2, 5, 10, 12, 13, 8, 11, 14)
-    if (anyo == 2012) v <- c(6, 4, 7, 1, 9, 3, 5, 13, 10, 2, 12, 8, 11, 14) 
+    if (anyo == 2011) v <- c(2, 9, 3, 7, 6, 4, 5, 1, 10, 15, 13, 12, 11, 16, 8, 14, 17, 18, 19, 20, 21)  
+    if (anyo == 2012) v <- c(2, 9, 3, 7, 6, 4, 5, 1, 10, 15, 13, 12, 11, 16, 8, 14, 17, 18, 19, 20, 21)  
   }
 
   if ( ac == "B.1" | ac == "B.2") {
-    if (anyo == 2011) v <- c(10, 6, 13, 9, 14, 8, 1, 3, 2, 12, 7, 5, 4, 11)  
-    if (anyo == 2012) v <- c(10, 6, 13, 9, 14, 8, 1, 3, 2, 12, 7, 5, 4, 11)
+    if (anyo == 2011) v <- c(6, 3, 7, 4, 16, 2, 8, 1, 13, 15, 11, 12, 9, 10, 5, 14, 17, 18, 19, 20, 21)
+    if (anyo == 2012) v <- c(6, 3, 7, 4, 16, 2, 8, 1, 13, 15, 11, 12, 9, 10, 5, 14, 17, 18, 19, 20, 21)
   }  
   
   if ( ac == "C.1" | ac == "C.2") {
-    if (anyo == 2011) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8)  
-    if (anyo == 2012) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8) 
+    if (anyo == 2011) v <- c(3, 9, 2, 6, 7, 4, 5, 1, 13, 10, 12, 10, 15, 16, 8, 14, 17, 18, 19, 20, 21)  
+    if (anyo == 2012) v <- c(3, 9, 2, 6, 7, 4, 5, 1, 13, 10, 12, 10, 15, 16, 8, 14, 17, 18, 19, 20, 21)
   }  
 
   if ( ac == "D") {
-    if (anyo == 2011) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8)  
-    if (anyo == 2012) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8) 
+    if (anyo == 2011) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8, 15, 16, 17, 18, 19, 20, 21)  
+    if (anyo == 2012) v <- c(7, 6, 13, 5, 9, 1, 2, 3, 12, 10, 4, 11, 14, 8, 15, 16, 17, 18, 19, 20, 21) 
   }  
   
   

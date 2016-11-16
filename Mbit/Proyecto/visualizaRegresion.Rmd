@@ -1,0 +1,956 @@
+---
+title: "Visualización de datos de Regresión Logística"
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
+
+source("analisisbasico.R")
+source("AnalisisRegresion.R")
+
+#liberación de variables
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroTomanA10Destino)
+rm(origenSanos)
+rm(ficheroNoTomanA10Destino)
+
+#Parámetros globales a usar
+size <- 5000
+bucle <- 1000
+generarSanosDiabeticos <- FALSE
+generarDiabeticos54246144 <- FALSE
+generarEvolucionTodos <- TRUE
+generarEvolucion6144 <- TRUE
+```
+
+#RL: Predicción de pacientes Sanos vs Diabéticos
+
+El objetivo es identificar en base a la toma de medicamentos si somos capaces de clasificar si es un paciente es diabético o es un paciente sano. 
+
+Hacemos una breve descripción de los números
+  * 2011: 8.851 pacientes diabéticos y 37.905 pacientes sanos. 
+  
+  * 2012: 10.128 pacients diabéticos y 35.054 pacientes sanos.
+
+El proceso, para clasificar si un paciente es Sano o Diabético es el siguiente:
+
+  a) Test --> Para el juego de Test se unen todos los pacientes de 2011 (8.851 + 37.905) y se eliminan las columnas de los ATCs que están a 0 para todos los pacientes. Esto hace que nos quedemos con 420 ATCs. Se hacen 500 realizaciones donde en cada realización se hace lo siguiente:
+  
+    * Se selecciona una muestra delos pacientes diabéticos (5.000 pacientes de 2011). La muestra se selecciona sin repetición.
+    
+    * Se seleccionan los pacientes sanos (otra muestra de 5.000 pacientes de 2011). La muestra también se selecciona sin repetición.
+    
+    * Se calcula la media de la muestra de 10.000 pacientes y la desviación típica. Si la desviación típica es 0, se sustituye por 1e-12.
+    
+    * Se normaliza la muestra con la media y la desviación típica calculada.
+  
+  b) Test --> Se toman todos los pacientes de 2012 (10.128 + 35.054) y se normaliza en cada realización con la media y la desviación típica calculada.
+
+##Generación de datos.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+if (generarSanosDiabeticos == TRUE) {
+  ##1.- Leemos los ficheros de datos.
+  ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+  diab <- procesaCSVDiabeticos(ficheros)
+  sanos <- procesaCSVSanos(ficheros)
+  
+  ##2.- Pasamos a existencia el 2011 de diabéticos. Estas son las variables que vamos a usar para calcular
+  # la regresión. Preparamos los datos para 2012.
+  diabn <- pasaAExistencia( subset(diab, diab$Anyo==2011) )
+  sanosn <- pasaAExistencia( subset(sanos, sanos$Anyo==2011), tipo="SANO")
+  diabn12 <- pasaAExistencia( subset(diab, diab$Anyo==2012) )
+  sanosn12 <- pasaAExistencia( subset(sanos, sanos$Anyo==2012), tipo="SANO")
+  pacientes12 <- rbind(diabn12, sanosn12)
+  rm(diabn12)
+  rm(sanosn12)
+
+  ##3.- Quitamos los ATCs vacíos y normalizamos las variables (la objetivo no). Calculamos y guardamos su 
+  #media y su desviación típica para luego el test y, separamos la población de diabéticos y de sanos para
+  #seguir con su proceso.
+  
+  #Eliminamos los Atcs de 2011 y también los quitamos de 2012.
+  pacientes <- eliminaATCsVacios( rbind(diabn, sanosn))
+  pacientes12 <- pacientes12[,colnames(pacientes12) %in% colnames(pacientes)]
+
+  #NO normalizamos aquí. Vamos a normalizar en cada iteración. 
+
+  #Separamos las poblaciones.
+  diabn_sin0 <- subset(pacientes, pacientes$Diabetico == 1)
+  sanosn_sin0 <- subset(pacientes, pacientes$Diabetico == 0)
+  
+  #Liberamos memoria
+  rm(pacientes)
+  rm(diabn)
+  rm(sanosn)
+  
+  #Dejamos huella en el log.
+  cat(paste("\n\n<b>Variables que se van a considerar:</b>",length(colnames(diabn_sin0))-1,"\n\n", sep=""))
+  cat(colnames(diabn_sin0)[1:(length(diabn_sin0)-1)])
+  cat("\n\n")
+
+  ##6.- Ahora toca hacer n realizaciones de size tamaño cada una de ellas, para poder analizar los IC.
+  #imprimeSensibilidadEspecifidad(diabn_sin0, sanosn_sin0, pacientes12, size)
+  
+  #Inicializamos para que los resultados sean repetibles.
+  set.seed(9910192)
+  
+  #Creamos un cluster de 6 cores para dejar 2 cores para otras tareas.
+  cluster <- makeCluster(6)
+  registerDoParallel( cluster )
+  resultado <- foreach(i=1:bucle, .combine = rbind) %dopar% {
+    ejecutaRegresion(diabn_sin0, sanosn_sin0, pacientes12, size, i)
+  }
+  stopCluster( cluster )
+
+  resultado <- as.data.frame(resultado)
+  resultado$pValue <- as.numeric(as.character(resultado$pValue))
+  resultado$Sensibilidad <- as.numeric(as.character(resultado$Sensibilidad))
+  resultado$Especificidad <- as.numeric(as.character(resultado$Especificidad))
+  
+  fichero <- paste(salidaDatos, "regresion.csv", sep="")
+  write.csv(resultado, fichero)
+  
+  rm(fichero)
+  rm(cluster)
+  rm(ficheros)
+  rm(pacientes12)
+  rm(diabn_sin0)
+  rm(sanosn_sin0)
+  rm(diab)
+  rm(sanos)
+} else {
+  cat("\n\nNo se ha activado la generación del fichero de datos. Se reutilizará el último generado.\n\n")
+  #Cargamos el fichero
+  fichero <- paste(salidaDatos, "regresion.csv", sep="")
+  resultado <-read.csv(fichero)
+  rm(fichero)
+}
+
+#Vamos a añadir una variable para tipificar el pValue 
+resultado$Tipo <- 1
+resultado$Tipo <- ifelse(resultado$pValue==0, 4, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0 & resultado$pValue <= 0.001, 3, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0.001 & resultado$pValue<=0.05,2, resultado$Tipo)
+```
+
+##Boxplot de Sensibilidad y Especificidad
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+s <- unique(resultado[, c("Realizacion", "Sensibilidad", "Especificidad")]) 
+par(mfrow=c(1,2), mar=c(3,3,3,3))
+min = round(min(s$Sensibilidad, s$Especificidad),4)
+max = round(max(s$Sensibilidad, s$Especificidad),4)
+boxplot(s$Sensibilidad, ylim=c(min, max), main="Sensibilidad")
+boxplot(s$Especificidad, ylim=c(min, max), main="Especificidad")
+rm(s)
+rm(min)
+rm(max)
+```
+
+##Distribución por Boxplot
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  atcsSignificativos <- c()
+  #df <- sqldf("select ATC, Tipo, count(*) as total from resultado group by ATC, Tipo")
+  familia <- c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+  cat("\n\n<b>Gráfica Boxplot ATC.Distribución medicamentos </b>\n\n")
+  atcsSignificativos <- pintaGraficaDistribucionATC(resultado, familia, "[0-9]+")
+  
+  cat("\n\n<b>Gráfica Boxplot Otros.Distribución Sexo y Edad </b>\n\n")
+  otros <- c("Sexo", "Edad")
+  atcsSignificativos <- c(atcsSignificativos, pintaGraficaDistribucionATC(resultado, otros, ""))
+  
+  cat("\n\n<b>Gráfica Boxplot Resumen.Distribución Variables más significaticas</b>\n\n")
+  #pintaGraficaDistribucionATC(atcsSignificativos)
+
+  rm(familia)
+  rm(otros)
+```
+
+    NOTA ANÁLISIS: Si destacamos los ATCs cuyo IC del 0.975 está por debajo del 0.05, son los siguientes:
+    
+    * Familia A: A02BC, A10AB, A10AC, A10AD, A10AE, A10BA, A10BB, A10BD, A10BF, A10BX y A11CC
+    
+    * Familia B: B03AC*
+    
+    * Familia C: C02AB, C03EA*, C09AA, C09BA, C09CA, C09DA, C10AA, C10AB
+    
+    * Familia G: G03EA*
+    
+    * Familia H: H01BB*, H03AA, H04AA, H05BX*
+    
+    * Familia L: L04AD*
+    
+    * Familia M: M04AA*
+    
+    * Familia N: N02AX*, N05AC*, N07BB*
+    
+    * Familia R: R03AC, R06AX
+    
+    * En Otros tanto Sexo como Edad son muy significativas
+    
+    Con esto tenemos 20 ATCs significativos para identenficar a un paciente diabético. Cuando revisamos en base a la probabilidad, habíamos detectado 16 ATCs importantes. Tenemos:
+    
+    * ATCs que coinciden en ambos casos: A02BC, A10AE, A10BA, C09AA, C10AA, N02AX*.
+    
+    * ATCs que aparecen con probabilidad solo y no son significativas en la regresión: B01AC, C08CA, J01CR, M01AE, M02AA, N02BB, N02BE, N05AL, N05BA, R05CB. 
+    
+    * ATCs que aparecen como significativos en la regresión y que no aparecen en la probabilidad: A10AB, A10AC, A10AD, A10BB, A10BD, A10BF, A10BX, A11CC, B03AC*, C02AB, C03EA*, C09BA, C09DA*, C10AB, G03EA*, H01BB, H03AA, H04AA, H05BX*, L04AD*, M04AA*, N05AC*, N07BB*, R03AC, R06AX. 
+    
+    NOTA: Los ATCs con * significa que aunque no está el 0.975 de la distribución por debajo del 0.05 si que tiene gran parte de la distribución (la caja entera del boxplot) ahí debajo de ese umbral.
+
+    A continuación ponemos el listado de medicamentos (Atcs con probabilidad de aparecer):
+    * B01AC - Inhibidores de la agregación plaquetaria, excluyendo heparina [B01A - Agentes antirombóticos.]
+    * C08CA - Dihydropyridine derivatives (bloqueador de calcio) [C08C - Bloqueantes selectivos de canales de calcio con efectos principalmente vasculares]
+    * J01CR - Asociaciones de penicilinas, incl. inhibidores de la beta-lactamasa [J01C - Beta-lactam antibacterials, penicillins]
+    * M01AE - Derivados del ácido propiónico [M01A - Productos antiinflamatorios y antirreumáticos no esteroideos]
+    * M02AA - Antiinflamatorios no esteroideos para uso tópico [M02A - Topical products for joint and muscular pain]
+    * N02AX - Otros opioides [N02A - Opioide]
+    * N02BB - Pirazolonas [N02B - Other analgesics and antipyretics]
+    * N02BE - Anilidas (paracetamol) [N02B - Other analgesics and antipyretics]
+    * N05AL - Benzamidas [N05A - Antipsicóticos]
+    * N05BA - Benzodiazepine derivatives [N05B - Anxiolíticos]
+    * R05CB - Mucolíticos [R05C Expectorantes]
+    
+    A continuación ponemos el listado de medicamentos (Atcs Significativos para la RL):
+    * A02BC - Inhibidores de la bomba de protones [A02B - Drugs for peptic ulcer and gastro-oesophageal reflux disease (GORD)]
+    * A10AB - Insulins and analogues for injection, fast-acting [A10A - Insulins and analogues]
+    * A10AE - Insulinas y análogos de acción prolongada [A10A - Insulins and analogues]
+    * A10BA - Biguanides [A10B - Blood glucose lowering drugs, excluding insulins]
+    * A10AC - Insulins and analogues for injection, intermediate-acting [A10A - Insulinas y análogos]
+    * A10AD - Insulins and analogues for injection, intermediate- or long-acting combined with fast-acting [A10A - Insulinas y análogos]
+    * A10BB - Sulfonylureas [A10B - Drogas hipoglucemiantes orales]
+    * A10BD - Combinations of oral blood glucose lowering drugs [A10B - Drogas hipoglucemiantes orales]
+    * A10BF - Alpha glucosidase inhibitors [A10B - Drogas hipoglucemiantes orales]
+    * A10BX - Other blood glucose lowering drugs, excluding insulins [A10B - Drogas hipoglucemiantes orales]
+    * A11CC - Vitamin D and analogues [A11C - Multivitanímicos]
+    * B03AC - Hierro trivalente, preparados parenterales [B03A - Preparados con hierro]
+    * C02AB - Methyldopa [C02A - ANTIADRENERGIC AGENTS, CENTRALLY ACTING]
+    * C03EA - Low-ceiling diuretics and potassium-sparing agents [C03E - Diuretics and potassium-sparing agents in combination]
+    * C09AA - Inhibidores ECA, monofármacos [C09A - ACE inhibitors, plain]
+    * C09BA - Inhibidores de la ECA y diuréticos [C09B - ACE inhibitors, combinations]
+    * C09CA - Antagonistas de angiotensina II, monodrogas [C09C - Antagonistas de angiotensina II, monodrogas]
+    * C09DA - Angiotensin II antagonists and diuretics [C09D - Angiotensin II antagonists, combinations]
+    * C10AA - Inhibidores de la HMG CoA reductasa [C10A - Lipid modifying agents, plain]
+    * C10AB - Fibratos [C10A - Lipid modifying agents, plain]
+    * G03EA - Andrógenos y Estrógenos [G03E - Androgens and female sex hormones in combination]
+    * H01BB - Oxytocin and analogues [H01B - Hormonas del lóbulo posterior de la hipófisis]
+    * H03AA - Thyroid hormones [H03A - Thyroid preparations]
+    * H04AA - Hormonas glucogenolíticas [H04A - Hormonas glucogenolíticas]
+    * H05BX - Other anti-parathyroid agents [H05B - Anti-parathyroid agents]
+    * L04AD - Inhibidores de la calcineurina [L04A - Hormonas y agentes relacionados]
+    * M04AA - Preparations inhibiting uric acid production [M04A - Antigout Preparations]
+    * N05AC - Fenotiazinas con estructura piperidínica [N05A - Antipsicóticos]
+    * N07BB - Drogas usadas contra la dependencia de alcohol [N07B - Drogas usadas en desórdenes adictivos]
+    * R03AC - Agonistas selectivos de receptores beta-2 adrenérgicos [R03A - Adrenergics, inhalants]
+    * R06AX - Other antihistamines for systemic use [R06A - Antihistamines for systemic use]
+
+<b>RESUMEN</b>
+
+En resumen, de forma "más mundana" tendríamos:
+
+  * Familia A
+      + Relacionado con la Diabetes
+          - Insulina (inyección y oral, de acción rápida y de acción prolongada).
+          - Medicamentos para bajar la glucosa en sangre que no son insulina.
+          - Medicamentos para úlceras y problemas gástricos.
+          - Vitamina D. He investigado en internet y he encontrado que se ha demostrado que es beneficioso para la diabetes el uso de este tipo de vitaminas (https://www.idf.org/sites/default/files/attachments/2009_2_Baeke%20et%20al_ES.pd)
+      + No relacionado específicamente con la Diabetes
+          - Medicamentos relacionados con la bilis.
+
+  * Familia B
+      + No relacionado específicamente con la diabetes
+          - Preparado de hierro, parece que puede haber relación entre exceso de hierro y la diabetes. (http://www.dinta.cl/wp-dintacl/wp-content/uploads/Hierro-y-Diabetes.pdf)
+
+  * Familia C
+      + Relacionados con la diabetes
+          - Inhibitors ACE (permiten relajar la tensión al dilatar los vasos sanguíneos). (http://www.news-medical.net/health/What-are-ACE-Inhibitors-(Spanish).aspx)
+          - Fármacos antiadrenérticos (ayuda a regular parámetros del metabolismo energético y gasto cardiaco). 
+          - Agentes de reducción de lípidos. Fundamentalmente sirven para controlar el colesterol. Los diabéticos tienden a tener alto el colesterol del malo (http://www.kaikubenecol.com/es/colesterol/consejos-practicos/elcolesterol)
+      + No relacionados específicamente con la diabetes
+          - Agentes diuréticos fundamentalmente para tratar la hipertensión.
+          - Medicamentos para la prevención de problemas cardiovasculares.
+
+  * Familia G
+      + No relacionado específicamente con la diabetes
+          - Anticonceptivos con contraindicaciones para la diabetes con problemas vasculares.
+
+  * Familia H
+      + Relacionados con la diabetes de alguna forma
+          - Hormonas del Tiroides (ayudan a regular proteinas, grasas y el metabolismo de carbohidratos). También estimulan el metabolismo vitamínico.
+          - Hormonas glucogenolíticas, que por lo visto, ayudan a que se genere más insulina por parte del cuerpo (https://books.google.es/books?id=4iGoHz4WoTIC&pg=PA43&lpg=PA43&dq=Hormonas+glucogenol%C3%ADticas&source=bl&ots=tGdr0ejNuF&sig=EcIYiQogBGq5PqlLcQmr6Bks4-Q&hl=es&sa=X&ved=0ahUKEwi2rNKcnpTLAhUkDJoKHShXAgwQ6AEITTAI#v=onepage&q=Hormonas%20glucogenol%C3%ADticas&f=false)
+      + No relacionados específicamente con la diabetes
+          - Algo relacionado con la Hipófisis.
+
+  * Familia M
+      + No relacionados específicamente con la diabetes
+          - Preparados para inhibir el ácido úrico.
+
+  * Familia N
+      + No relacionados específicamente con la diabetes
+          - Antipsicóticos.
+          - Medicación para dejar de beber.
+
+  * Familia R
+      + Relacionados con la Diabetes
+          - Agonistas selectivos de receptores beta-2 adrenérgicos que parece que sirve para controlar el asma, la obesidad y la diabetes (https://es.wikipedia.org/wiki/Receptor_adrenérgico_beta_2)
+      + No relacionados con la Diabetes.
+          - Antiestamísticos.
+
+  * Familia S
+      + No relacionados con la Diabetes
+          - Anti-inflamatorios y antibióticos.
+
+       
+ENLACES DE INTERES:        
+
+
+    a) www.chospab.es/area.../GUIA_FARMACOTERAPEUTICA_CSS.doc
+
+    b) http://www.msssi.gob.es/biblioPublic/publicaciones/recursos_propios/infMedic/docs/BoletinVol34n1_12a25.pdf
+
+    c) http://www.san.gva.es/documents/152919/5581463/Análisis+duplicidades_C09_Ag.+actúan+SRAA_08042015.pdf
+(Diabetes y C09DA están contraindicados.
+
+    Administración simultánea de un IECA sólo (C09AA) o en combinación con diurético (C09BA) o con bloqueante del calcio (C09BB) y un inhibidor de la renina (C09XA) como monofármaco o en combinación con diurético:
+    • La nota informativa de la AEMPS de Abril 2014, sobre el uso combinado de medicamentos que actúan sobre el sistema renina-angiotensina recomienda no utilizar terapia combinada con medicamentos que actúan sobre el SRA (IECA, ARA II o aliskiren), excepto en aquellos casos excepcionales en los que se considere imprescindible bajo estrecha monitorización por parte de un médico con experiencia. También indica que la combinación de aliskiren con IECA o ARA II en pacientes con insuficiencia renal moderada-grave o diabetes está contraindicada.
+    Por lo tanto debería considerarse duplicidad: C09AA + C09XA C09BA + C09XA C09BB + C09XA
+
+    Administración simultánea de un ARA II como monofármaco (C09C) o en combinación (C09D) y un inhibidor de la renina (C09XA) como monofármaco o en combinación con diurético:
+    La nota informativa de la AEMPS de Abril 2014, sobre el uso combinado de medicamentos que actúan sobre el sistema renina-angiotensina recomienda no utilizar terapia combinada con medicamentos que actúan sobre el SRA (IECA, ARA II o aliskiren), excepto en aquellos casos excepcionales en los que se considere imprescindible bajo estrecha monitorización por parte de un médico con experiencia. También indica que la combinación de aliskiren con IECA o ARA II en pacientes con insuficiencia renal moderada-grave o diabetes está contraindicada.
+    C09CA + C09XA C09D + C09XA
+
+
+    d) Diabetes insípidas: https://www.nlm.nih.gov/medlineplus/spanish/ency/article/000377.htm
+
+#RL: Predicción de pacientes Diabéticos 5424 vs 6144
+
+El objetivo es identificar en base a la toma de medicamentos si somos capaces de clasificar si un paciente pertenece al CRG 5424 o al CRG 6144. 
+
+##Generación de datos.
+
+Vamos a generar los datos para analizar luego los boxplots. A diferencia del caso anterior, donde teníamos que hacer un muestreo de los sanos para nivelar, los datos que tenemos ahora son:
+
+- Diabéticos 2011 y crg 5424 --> 2.035 pacientes.
+
+- Diabéticos 2011 y crg 6144 --> 2.939 pacientes. 
+
+Por lo tanto vamos a usar todos los pacientes tal cuel para el entrenamiento. 
+
+Hacemos una breve descripción de los números
+  * 2011: 2.035 pacientes en CRG 5424 y 2.939 pacientes en CRG 6144. 
+  
+  * 2012: 2.079 pacients en CRG 5424 y 3.163 pacientes en CRG 6144.
+
+El proceso, para clasificar el CRG de un paciente es:
+
+  a) Test --> Para el juego de Test se unen todos los pacientes de 2011 (2.035 + 2.939) y se eliminan las columnas de los ATCs que están a 0 para todos los pacientes. Esto hace que nos quedemos con 301 ATCs. Se hacen 500 realizaciones donde en cada realización se hace lo siguiente:
+  
+    * Se seleccionan todos los pacientes en CRG 5424 (2.035 pacientes de 2011). 
+    
+    * Se seleccionan los pacientes en CRG 6144 (2.035 de 2.939 pacientes de 2011). La muestra también se selecciona sin repetición.
+    
+    * Se calcula la media de la muestra de 4.070 pacientes y la desviación típica. Si la desviación típica es 0, se sustituye por 1e-12.
+    
+    * Se normaliza la muestra con la media y la desviación típica calculada.
+  
+  b) Test --> Se toman todos los pacientes de 2012 (2.079 + 3.163) y se normaliza en cada realización con la media y la desviación típica calculada.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+if (generarDiabeticos54246144 == TRUE) {
+  #procesamos el CSV final.
+  ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+  diab <- procesaCSVDiabeticos(ficheros)
+  
+  ##2.- Pasamos a existencia el 2011 de diabéticos que están en 5424 y 6144. Estas son las variables que 
+  #vamos a usar para calcular la regresión. Preparamos los datos para 2012.
+  diab5424n <- pasaAExistencia( subset(diab, diab$Anyo==2011 & diab$CRG == 5424), tipo="SANO" )
+  diab6144n <- pasaAExistencia( subset(diab, diab$Anyo==2011 & diab$CRG == 6144) )
+  diab5424n_12 <- pasaAExistencia( subset(diab, diab$Anyo==2012 & diab$CRG == 5424), tipo="SANO" )
+  diab6144n_12 <- pasaAExistencia( subset(diab, diab$Anyo==2012 & diab$CRG == 6144) )
+  pacientes12 <- rbind(diab5424n_12, diab6144n_12)
+  rm(diab5424n_12)
+  rm(diab6144n_12)
+  size <- min(nrow(diab5424n), nrow(diab6144n))
+  
+  #3.- Eliminamos los Atcs de 2011 y también los quitamos de 2012.
+  pacientes <- eliminaATCsVacios( rbind(diab5424n, diab6144n) )
+  pacientes12 <- pacientes12[,colnames(pacientes12) %in% colnames(pacientes)]
+
+  #4.- Separamos las poblaciones.
+  diab5424n_sin0 <- subset(pacientes, pacientes$Diabetico == 0)
+  diab6144n_sin0 <- subset(pacientes, pacientes$Diabetico == 1)
+  
+  #Liberamos memoria
+  rm(pacientes)
+  rm(diab5424n)
+  rm(diab6144n)
+  
+  #Dejamos huella en el log.
+  cat(paste("\n\n<b>Variables que se van a considerar:</b>",length(pacientes12)-1,"\n\n", sep=""))
+  cat(colnames(diab5424n_sin0)[1:(length(diab5424n_sin0)-1)])
+  cat("\n\n")
+
+  imprimeSensibilidadEspecifidad(diab6144n_sin0, diab5424n_sin0, pacientes12, size)
+  
+  #Creamos un cluster de 6 cores para dejar 2 cores para otras tareas.
+  cluster <- makeCluster(6)
+  registerDoParallel( cluster )
+  resultado <- foreach(i=1:bucle, .combine = rbind) %dopar% {
+    ejecutaRegresion(diab6144n_sin0, diab5424n_sin0, pacientes12, size, i)
+  }
+  stopCluster( cluster )
+  
+  resultado <- as.data.frame(resultado)
+  resultado$pValue <- as.numeric(as.character(resultado$pValue))
+  resultado$Sensibilidad <- as.numeric(as.character(resultado$Sensibilidad))
+  resultado$Especificidad <- as.numeric(as.character(resultado$Especificidad))
+  
+  fichero <- paste(salidaDatos, "regresionDiabeticos.csv", sep="")
+  write.csv(resultado, fichero)
+  
+  rm(fichero)
+  rm(cluster)
+  rm(ficheros)
+  rm(pacientes12)
+  rm(diab5424n_sin0)
+  rm(diab6144n_sin0)
+  
+  rm(diab)
+} else {
+  cat("\n\nNo se ha activado la generación del fichero de datos. Se reutilizará el último generado.\n\n")
+  #Cargamos el fichero
+  fichero <- paste(salidaDatos, "regresionDiabeticos.csv", sep="")
+  resultado <-read.csv(fichero)
+  rm(fichero)
+}
+
+#Vamos a añadir una variable para tipificar el pValue 
+resultado$Tipo <- 1
+resultado$Tipo <- ifelse(resultado$pValue==0, 4, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0 & resultado$pValue <= 0.001, 3, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0.001 & resultado$pValue<=0.05,2, resultado$Tipo)
+```
+
+##Boxplot de Sensibilidad y Especificidad
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+s <- unique(resultado[, c("Realizacion", "Sensibilidad", "Especificidad")]) 
+par(mfrow=c(1,2), mar=c(3,3,3,3))
+min = round(min(s$Sensibilidad, s$Especificidad),4)
+max = round(max(s$Sensibilidad, s$Especificidad),4)
+boxplot(s$Sensibilidad, ylim=c(min, max), main="Sensibilidad")
+boxplot(s$Especificidad, ylim=c(min, max), main="Especificidad")
+rm(s)
+rm(min)
+rm(max)
+```
+
+##Distribución por Boxplot
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+atcsSignificativos <- c()
+#df <- sqldf("select ATC, Tipo, count(*) as total from resultado group by ATC, Tipo")
+familia <- c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+cat("\n\n<b>Gráfica Boxplot ATC.Distribución medicamentos </b>\n\n")
+atcsSignificativos <- pintaGraficaDistribucionATC(resultado, familia, "[0-9]+")
+
+cat("\n\n<b>Gráfica Boxplot Otros.Distribución Sexo y Edad </b>\n\n")
+otros <- c("Sexo", "Edad")
+atcsSignificativos <- c(atcsSignificativos, pintaGraficaDistribucionATC(resultado, otros, ""))
+
+cat("\n\n<b>Gráfica Boxplot Resumen.Distribución Variables más significaticas</b>\n\n")
+#pintaGraficaDistribucionATC(atcsSignificativos)
+
+rm(familia)
+rm(otros)
+```
+
+NOTA ANÁLISIS: Si destacamos los ATCs cuyo IC del 0.975 está por debajo del 0.05, son los siguientes:
+  
+  * Familia A: A02AH*, A02BC, A10AC, A10AD, A10AE
+  
+  * Familia B: B05XA*
+
+  * Familia C: C02AB, C03AA, C03BA, C03CA, C03EA, C04AD, C07AA*, C07AB, C07AG*, C08CA, C08DA, C08DB, C09AA, C09BA, C09CA, C09DA, C09DB, 
+
+  * Familia G: G02CC*, G04CA
+
+  * Curiosamente, el Sexo no es ahora una variable significativa, aunque la Edad sí que sigue siendo significativa.
+
+Resulta curioso que según el análisis de correspondencia los ATCs N estaban muy relacionados con el CRG-base y no sean variables significativas. 
+
+    A continuación ponemos el listado de medicamentos (Atcs Significativos para la RL):
+    * A02BC - Inhibidores de la bomba de protones [A02B - Drugs for peptic ulcer and gastro-oesophageal reflux disease (GORD)]
+    * A10AC - Insulins and analogues for injection, intermediate-acting [A10A - Insulinas y análogos]
+    * A10AD - Insulins and analogues for injection, intermediate- or long-acting combined with fast-acting [A10A - Insulinas y análogos]
+    * A10AE - Insulinas y análogos de acción prolongada [A10A - Insulins and analogues]
+    * B05XA - Soluciones electrolíticas [B05X - Aditivos para soluciones intravenosas]
+    * C02AB - Methyldopa [C02A - ANTIADRENERGIC AGENTS, CENTRALLY ACTING]
+    * C03AA - Thiazides, plain [C03A - Low-ceiling diuretics, Thiazides]
+    * C03BA - Sulfonamides, plain [C03B - Low-ceiling diuretics, excluding thiazides]. Puede generar hiperglucemia.
+    * C03CA - Sulfonamides, plain [C03C - Hi-ceiling diuretics]
+    * C03EA - Low-ceiling diuretics and potassium-sparing agents [C03E - Diuretics and Potassium-Sparing agents in combination]. Precaución en diabéticos.
+    * C04AD - Purine derivatives [C04A - Peripheral vasodilators]
+    * C07AA - Beta-Bloqueantes adrenérgicos no cardioselectivos [C07A - Beta blocking agents]. Precaución en diabéticos.
+    * C07AB - Agentes beta- bloqueantes selectivos [C07A - Agentes beta-bloqueantes]. Precaución en diabéticos
+    * C07AG - Agentes bloqueantes alfa y beta [C07A - Agentes beta-bloqueantes]
+    * C08CA - Inhibidores de la HMG CoA reductasa [C08C - Selective calcium channel blockers with mainly vascular effects]
+    * C08DA - Bloqueante de los canales de calcio: Derivados de Dihidropiridina [C08D - Selective calcium channel blockers with direct cardiac effects]
+    * C08DB - Derivados de la benzotiazepina [C08D - Bloqueantes selectivos del canal de calcio con efectos cardiacos directos]
+    * C09AA - Inhibidores ECA, monofármacos [C09A - ACE inhibitors, plain]
+    * C09BA - Inhibidores de la ECA y diuréticos [C09B - ACE inhibitors, combinations]
+    * C09CA - Antagonistas de angiotensina II, monodrogas [C09C - Antagonistas de angiotensina II, monodrogas]. Se recomienda para diabéticos con nefropatía en vez del IECA.
+    * C09DA - Antagonistas de angiotensina II y diuréticos [C09D - Antagonistas de angiotensina II, combinaciones]
+    * C09DB - Angiotensin II antagonists and calcium channel blockers [C09D - Antagonistas de angiotensina II, combinaciones]
+    * G02CC - Antiinflammatory products for vaginal administration [G02C - Other Gynecologicals]
+    * G04CA - Antagonistas de los receptores alfa adrenérgicos [G04C - Drogas usadas en la hiperplasia benigna de próstata]
+
+<b>RESUMEN</b>
+
+En resumen, de forma "más mundana" tendríamos:
+
+  * Familia A
+      + Relacionado con la Diabetes
+          - Insulina (inyección y oral, de acción rápida y de acción prolongada).
+          - Medicamentos para úlceras y problemas gástricos.
+ (https://www.idf.org/sites/default/files/attachments/2009_2_Baeke%20et%20al_ES.pd)
+ 
+  * Familia C
+      + No relacionados específicamente con la diabetes
+          - Agentes diuréticos 
+          - Inhibitors ACE (permiten relajar la tensión al dilatar los vasos sanguíneos). (http://www.news-medical.net/health/What-are-ACE-Inhibitors-(Spanish).aspx)
+          - Fármacos antiadrenérticos (ayuda a regular parámetros del metabolismo energético y gasto cardiaco).
+          - Agentes de reducción de lípidos. Fundamentalmente sirven para controlar el colesterol. Los diabéticos tienden a tener alto el colesterol del malo (http://www.kaikubenecol.com/es/colesterol/consejos-practicos/elcolesterol)
+          
+      + Importante ver la relación de medicamentos que no se recomiendan para diabéticos o que hay que tomar con precaución en diabéticos y que son necesarios para la hipertensión.
+
+  * Familia G
+      + No relacionado específicamente con la diabetes
+          - Medicamentos para la próstata y para las inflamaciones vaginales.
+
+#RL: Predicción de Evolución (todos CRGs evolucionados en 2012) para pacientes que estaban en 2011 como 5424
+
+Ahora toca hacer una revisión de los ATCs que tomaron los pacientes que han evolucionado de 5424 en 2011 en 2012 (o bien se han mantenido en 5424 y en 6144). 
+
+##Generación de datos.
+
+Vamos a generar los datos para analizar luego los boxplots. Los datos que tenemos ahora son:
+
+- Diabéticos 2011 y crg 5424 --> 1.857 pacientes (al quitar todos los ATCs a 0's se han caído algunos).
+
+- Esos pacientes en 2012 
+    - Se mantienen en 5424 --> 1.339 pacientes. 
+    - Evolucionan a 6144 --> 152 pacientes.
+    - Evolucionan a 7071 --> 18 pacientes.
+    
+En cambio si hacemos un modelo de regresión predecir si va a evolucionar o si se va a mantener, es decir, consideramos a todos aquellos que van a evolucionar tendríamos 518 pacientes y no solo los 170 de evolución en la hipertensión. <b>Esto es lo que he usado en esta ejecución</b>.
+
+Para ello, se tiene que generar una matriz que tenga:
+    - ATCs en 2011. 
+    - Sexo, Edad de 2011.
+    - Una variable que es 0 indicando que se mantiene en 5424, y un 1 indicando que han evolucionado a 6144.
+    
+  NOTA IMPORTANTE: Los pasos a seguir son:
+  
+  a) Normalizamos todos pacientes muestreados en cada realización (1.339 que se han mantenido en el CRG 5424 y los 518 pacientes que han evolucionado a otros CRGs)
+  
+  b) En cada realización, nos quedamos con el 80% de cada grupo para entrenamiento y validamos con el 20% restante.
+  
+  c) Esto lo hacemos 500 veces.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+size <- 122
+if (generarEvolucionTodos == TRUE) {
+  #1.- Leemos los datos del fichero y nos quedamos para los pacientes en Análisis.
+  ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+  diab <- procesaCSVDiabeticos(ficheros)
+  aux <- getDatos2011PacientesEvolucion(diab, 2011, NULL)
+  Id2012_5424 <- diab[diab$Anyo==2012 & diab$CRG==5424 & diab$Id %in% aux$Id,"Id"]
+  Id2012_otros <- diab[diab$Anyo==2012 & diab$CRG != 5424  & diab$Id %in% aux$Id,"Id"]
+  
+  ##2.- Pasamos a existencia el 2011 de diabéticos que están en 5424 y 6144. Estas son las variables que 
+  #vamos a usar para calcular la regresión. 
+  diab5424n <- pasaAExistencia( diab[diab$Anyo==2011 & diab$Id %in% Id2012_5424,], tipo = "SANO" )
+  diabOtrosn <- pasaAExistencia( diab[diab$Anyo==2011 & diab$Id %in% Id2012_otros,] )
+  rm(aux)
+  rm(Id2012_5424)
+  rm(Id2012_otros)
+  
+  ##3.- Quitamos los ATCs vacíos y normalizamos las variables (la objetivo no). Calculamos y guardamos su 
+  #media y su desviación típica para luego el test y, separamos la población de diabéticos y de sanos para
+  #seguir con su proceso.
+  
+  #Eliminamos los Atcs de 2011.
+  pacientes <- eliminaATCsVacios( rbind(diab5424n, diabOtrosn) )
+  
+  #Separamos las poblaciones.
+  diab5424n_sin0 <- subset(pacientes, pacientes$Diabetico == 0)
+  diabOtrosn_sin0 <- subset(pacientes, pacientes$Diabetico == 1)
+  
+  #Liberamos memoria
+  rm(pacientes)
+  rm(diab5424n)
+  rm(diabOtrosn)
+  
+  #Dejamos huella en el log.
+  cat(paste("\n\n<b>Variables que se van a considerar:</b>",length(diabOtrosn_sin0)-1,"\n\n", sep=""))
+  cat(colnames(diab5424n_sin0)[1:(length(diab5424n_sin0)-1)])
+  cat("\n\n")
+
+  imprimeSensibilidadEspecifidadEvolucion(diabOtrosn_sin0, diab5424n_sin0, 80)
+  
+  #Creamos un cluster de 6 cores para dejar 2 cores para otras tareas.
+  cluster <- makeCluster(6)
+  registerDoParallel( cluster )
+  resultado <- foreach(i=1:bucle, .combine = rbind) %dopar% {
+    ejecutaRegresionEvolucion(diabOtrosn_sin0, diab5424n_sin0, 80, i)
+  }
+  stopCluster( cluster )
+  
+  resultado <- as.data.frame(resultado)
+  resultado$pValue <- as.numeric(as.character(resultado$pValue))
+  resultado$Sensibilidad <- as.numeric(as.character(resultado$Sensibilidad))
+  resultado$Especificidad <- as.numeric(as.character(resultado$Especificidad))
+  
+  fichero <- paste(salidaDatos, "regresionEvolucionTodos.csv", sep="")
+  write.csv(resultado, fichero)
+  
+  rm(fichero)
+  rm(cluster)
+  rm(diabOtrosn_sin0)
+  rm(diab5424n_sin0)
+  
+  rm(diab)
+}else {
+  cat("\n\nNo se ha activado la generación del fichero de datos. Se reutilizará el último generado.\n\n")
+  #Cargamos el fichero
+  fichero <- paste(salidaDatos, "regresionEvolucionTodos.csv", sep="")
+  resultado <- read.csv(fichero)
+  rm(fichero)
+}
+
+#Vamos a añadir una variable para tipificar el pValue 
+resultado$Tipo <- 1
+resultado$Tipo <- ifelse(resultado$pValue==0, 4, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0 & resultado$pValue <= 0.001, 3, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0.001 & resultado$pValue<=0.05,2, resultado$Tipo)
+
+```
+
+##Boxplot de Sensibilidad y Especificidad
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+s <- unique(resultado[, c("Realizacion", "Sensibilidad", "Especificidad")]) 
+par(mfrow=c(1,2), mar=c(3,3,3,3))
+min = round(min(s$Sensibilidad, s$Especificidad),4)
+max = round(max(s$Sensibilidad, s$Especificidad),4)
+boxplot(s$Sensibilidad, ylim=c(min, max), main="Sensibilidad")
+boxplot(s$Especificidad, ylim=c(min, max), main="Especificidad")
+rm(s)
+rm(min)
+rm(max)
+```
+
+##Distribución por Boxplot
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+atcsSignificativos <- c()
+familia <- c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+cat("\n\n<b>Gráfica Boxplot ATC.Distribución medicamentos </b>\n\n")
+atcsSignificativos <- pintaGraficaDistribucionATC(resultado, familia, "[0-9]+")
+
+cat("\n\n<b>Gráfica Boxplot Otros.Distribución Sexo y Edad </b>\n\n")
+otros <- c("Sexo", "Edad")
+atcsSignificativos <- c(atcsSignificativos, pintaGraficaDistribucionATC(resultado, otros, ""))
+
+cat("\n\n<b>Gráfica Boxplot Resumen.Distribución Variables más significaticas</b>\n\n")
+#pintaGraficaDistribucionATC(atcsSignificativos)
+
+rm(familia)
+rm(otros)
+```
+
+NOTA ANÁLISIS: Si destacamos los ATCs cuyo IC del 0.975 está por debajo del 0.05, son los siguientes:
+  
+  * Familia A: A02BC*
+  
+  * Familia B: B03BA
+
+  * Familia C: No sale ningún ATC de esta familia como significativo. Puede ser razonable porque aún no son hipertensos y no han comenzado a tomar estos medicamentos de forma masiva.
+  
+  * Familia D: D01BA* (para infecciones de piel, uñas o pelo)
+
+  * Familia L: L04AA* (para reforzar las defensas después de los transplantes)
+  
+  * Familia P: P03AC*
+  
+  * Familia R: R03BB*
+
+  * Curiosamente, el Sexo sigue sin ser significativa y la Edad sigue siéndolo.
+
+
+    A continuación ponemos el listado de medicamentos (Atcs Significativos para la RL):
+    * A02BC - Inhibidores de la bomba de protones [A02B - Drugs for peptic ulcer and gastro-oesophageal reflux disease (GORD)]
+    * B03BA - Vitamina B12 [B03B - Vitamin B12 and folic acid]. Por lo que he podido leer la metmorfina (A10BA02) produce que no se absorba la vitamina B12, por lo que es necesario reforzar la dieta con con B12.
+    * D01BA - Antifungals for systemic use [D01B - Antifungals for systemic use]
+    * L04AA - Selective immunosuppressants [L04A - immunosuppressants]
+    * P03AC - Pyrethrines, incl. synthetic compounds [P03A - Ectoparasiticides, incl. Scabicides]
+    * R03BB - Anticholinergics [R03B - Other Drugs for Obstructuve Airway Diseases, Inhalants]
+
+<b>RESUMEN</b>
+
+En resumen, de forma "más mundana" tendríamos:
+
+  * Familia A. No sale ningún medicamento de ATC de diabéticos como significativo. Es decir, entiendo que se usa en todos y no sirve para discriminar. 
+  
+  * Familia B. La Vitamina B12 aparece como el 75% < al pValue de 0.05, pero no llega a estar el 0.975 por debajo. Pudiera estar relacionado con algunos de los pacientes. De todas formas, son 11 pacientes los que toman B12 y de esos 11, 10 han evolucionado (4 al 6143, 3 al 6144, 1 al 6145 y 1 al 7023)
+  
+  * Familia D. Solo hay un paciente que lo tome y ha evolucionado al 6141.
+  
+  * Familia L. Solo hay un paciente que lo tome y ha evolucionado al 7071.
+
+  * Familia P. Solo hay un paciente que lo tome y se ha mantenido en el 5424.
+  
+  * Familia R. 
+      + R03BB. Solo hay doce pacientes que lo tomen (2 mantienen en 5424, 6 evolucionan al 6142, 2 evolucionan al 6141, uno evoluciona al 6111 y uno evoluciona 6120)
+      + R06AX. 191 pacientes, donde 136 se mantienen en 5424. 
+  
+<b>Resumen:</b>
+
+Parece que la variable realmente significante que se está usando para clasificar / predecir es la Edad. Por eso ese nivel tan bajo de Sensibilidad.
+
+
+#RL: Predicción de Evolución (CRGs 2012 solo 5424 y 6144) para pacientes que estaban en 2011 como 5424
+
+Ahora toca hacer una revisión de los ATCs que tomaron los pacientes que han evolucionado de 5424 en 2011 en 2012 (o bien se han mantenido en 5424 y en 6144). 
+
+##Generación de datos.
+
+Vamos a generar los datos para analizar luego los boxplots. Los datos que tenemos ahora son:
+
+- Diabéticos 2011 y crg 5424 --> 1.857 pacientes (al quitar todos los ATCs a 0's se han caído algunos).
+
+- Esos pacientes en 2012 
+    - Se mantienen en 5424 --> 1.339 pacientes. 
+    - Evolucionan a 6144 --> 152 pacientes.
+    - Evolucionan a 7071 --> 18 pacientes.
+    
+Nos vamos a centrar en revisar solo los 5424 y los 6144. Para ello, se tiene que generar una matriz que tenga:
+    - ATCs en 2011. 
+    - Sexo, Edad de 2011.
+    - Una variable que es 0 indicando que se mantiene en 5424, y un 1 indicando que han evolucionado a 6144.
+    
+  NOTA IMPORTANTE: Los pasos a seguir son:
+  
+  a) Normalizamos todos los pacientes (1.339 que se han mantenido en el CRG 5424 y los 152 pacientes que han evolucionado a otros CRGs)
+  
+  b) En cada realización, nos quedamos con el 80% de cada grupo para entrenamiento y validamos con el 20% restante.
+  
+  c) Esto lo hacemos 1000 veces.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+size <- 122
+if (generarEvolucion6144 == TRUE) {
+    #1.- Leemos los datos del fichero y nos quedamos para los pacientes en Análisis.
+  ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+  diab <- procesaCSVDiabeticos(ficheros)
+  aux <- getDatos2011PacientesEvolucion(diab, 2011, c(5424, 6144))
+  Id2012_5424 <- diab[diab$Anyo==2012 & diab$CRG==5424 & diab$Id %in% aux$Id,"Id"]
+  Id2012_otros <- diab[diab$Anyo==2012 & diab$CRG != 5424  & diab$Id %in% aux$Id,"Id"]
+  
+  ##2.- Pasamos a existencia el 2011 de diabéticos que están en 5424 y 6144. Estas son las variables que 
+  #vamos a usar para calcular la regresión. 
+  diab5424n <- pasaAExistencia( diab[diab$Anyo==2011 & diab$Id %in% Id2012_5424,], tipo = "SANO" )
+  diabOtrosn <- pasaAExistencia( diab[diab$Anyo==2011 & diab$Id %in% Id2012_otros,] )
+  rm(aux)
+  rm(Id2012_5424)
+  rm(Id2012_otros)
+  
+  ##3.- Quitamos los ATCs vacíos y normalizamos las variables (la objetivo no). Calculamos y guardamos su 
+  #media y su desviación típica para luego el test y, separamos la población de diabéticos y de sanos para
+  #seguir con su proceso.
+  pacientes <- eliminaATCsVacios( rbind(diab5424n, diabOtrosn) )
+  
+  #Separamos las poblaciones.
+  diab5424n_sin0 <- subset(pacientes, pacientes$Diabetico == 0)
+  diabOtrosn_sin0 <- subset(pacientes, pacientes$Diabetico == 1)
+  
+  #Liberamos memoria
+  rm(pacientes)
+  rm(diab5424n)
+  rm(diabOtrosn)
+  
+  #Dejamos huella en el log.
+  cat(paste("\n\n<b>Variables que se van a considerar:</b>",length(diabOtrosn_sin0)-1,"\n\n", sep=""))
+  cat(colnames(diab5424n_sin0)[1:(length(diab5424n_sin0)-1)])
+  cat("\n\n")
+
+  imprimeSensibilidadEspecifidadEvolucion(diabOtrosn_sin0, diab5424n_sin0, 80)
+  
+  #Creamos un cluster de 6 cores para dejar 2 cores para otras tareas.
+  cluster <- makeCluster(1)
+  registerDoParallel( cluster )
+  resultado <- foreach(i=1:bucle, .combine = rbind) %do% {
+    ejecutaRegresionEvolucion(diabOtrosn_sin0, diab5424n_sin0, 80, i)
+  }
+  stopCluster( cluster )
+  
+  resultado <- as.data.frame(resultado)
+  resultado$pValue <- as.numeric(as.character(resultado$pValue))
+  resultado$Sensibilidad <- as.numeric(as.character(resultado$Sensibilidad))
+  resultado$Especificidad <- as.numeric(as.character(resultado$Especificidad))
+
+  fichero <- paste(salidaDatos, "regresionEvolucionHipertension.csv", sep="")
+  write.csv(resultado, fichero)
+  
+  rm(fichero)
+  rm(cluster)
+  rm(diabOtrosn_sin0)
+  rm(diab5424n_sin0)
+  
+  rm(diab)
+}else {
+  cat("\n\nNo se ha activado la generación del fichero de datos. Se reutilizará el último generado.\n\n")
+  #Cargamos el fichero
+  fichero <- paste(salidaDatos, "regresionEvolucionHipertension.csv", sep="")
+  resultado <- read.csv(fichero)
+  rm(fichero)
+}
+
+#Vamos a añadir una variable para tipificar el pValue 
+resultado$Tipo <- 1
+resultado$Tipo <- ifelse(resultado$pValue==0, 4, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0 & resultado$pValue <= 0.001, 3, resultado$Tipo)
+resultado$Tipo <- ifelse(resultado$pValue> 0.001 & resultado$pValue<=0.05,2, resultado$Tipo)
+
+```
+
+##Boxplot de Sensibilidad y Especificidad
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+s <- unique(resultado[, c("Realizacion", "Sensibilidad", "Especificidad")]) 
+par(mfrow=c(1,2), mar=c(3,3,3,3))
+min = round(min(s$Sensibilidad, s$Especificidad),4)
+max = round(max(s$Sensibilidad, s$Especificidad),4)
+boxplot(s$Sensibilidad, ylim=c(min, max), main="Sensibilidad")
+boxplot(s$Especificidad, ylim=c(min, max), main="Especificidad")
+rm(s)
+rm(min)
+rm(max)
+```
+
+##Distribución por Boxplot
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+atcsSignificativos <- c()
+familia <- c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+cat("\n\n<b>Gráfica Boxplot ATC.Distribución medicamentos </b>\n\n")
+atcsSignificativos <- pintaGraficaDistribucionATC(resultado, familia, "[0-9]+")
+
+cat("\n\n<b>Gráfica Boxplot Otros.Distribución Sexo y Edad </b>\n\n")
+otros <- c("Sexo", "Edad")
+atcsSignificativos <- c(atcsSignificativos, pintaGraficaDistribucionATC(resultado, otros, ""))
+
+cat("\n\n<b>Gráfica Boxplot Resumen.Distribución Variables más significaticas</b>\n\n")
+#pintaGraficaDistribucionATC(atcsSignificativos)
+
+rm(familia)
+rm(otros)
+```
+
+NOTA ANÁLISIS: Si destacamos los ATCs cuyo IC del 0.975 está por debajo del 0.05, son los siguientes:
+  
+  * Familia A: A11CA*, A11DA
+  
+  * Familia B: B01AB*
+
+  * Familia C: C07BB*, C09AA*, C09XA*
+  
+  * Familia D: D07AB*
+  
+  * Familia J: J01DD*, J01XE
+  
+  * Familia P: P03AC*
+  
+  * Familia R: R03BB*, R06AX*
+
+  * Curiosamente, el Sexo sigue sin ser significativa y la Edad sigue siéndolo.
+
+
+    A continuación ponemos el listado de medicamentos (Atcs Significativos para la RL):
+    * A11CA - Vitamina A [A11C - Vitamina A y D]
+    * A11DA - Vitamina B1 [A11D - Vitamina B1, plain and in combination with Vitamina B6 and B12]
+    * B01AB - Heparin group [B01B - Agentes antitrombos]. 
+    * C07BB - Antifungals for systemic use [C07B - Antifungals for systemic use]
+    * C09AA - Inhibidores ECA, monofármacos [C09A - ACE inhibitors, plain]
+    * C09XA - Renin-inhibitors [C09X - Other agents acting on the renin-angiotensin system]
+    * D07AB - Corticosteroids, moderately potent (group II) [D07A - Corticosteroids, plain]
+    * J01DD - Third-generation cephalosporins [J01D - Other Beta-Lactam antibacterials]
+    * J01XE - Nitrofuran derivatives [J01X - Other antibacterials]
+    * P03AC - Pyrethrines, incl. synthetic compounds [P03A - Ectoparasiticides, incl. Scabicides]
+    * R03BB - Anticholinergics [R03B - Other Drugs for Obstructuve Airway Diseases, Inhalants]
+    * R06AX - Other antihistamines for systemic use [R06A - Antihistamines for systemic use]
+
+<b>RESUMEN</b>
+
+En resumen, de forma "más mundana" tendríamos:
+
+  * Familia A. Salen vitaminas (1 paciente que evoluciona para la A, 1 paciente para la B1 que evoluciona). 
+  * Familia B. Hay 46 pacientes que toman los anti-trombos y 7 han evolucionado al 6144 y 20 se mantienen en el 5424. El resto evolucionan a otros). 
+  
+  * Familia C.
+      + C07BB. Hay 4 pacientes de los que 1 se mantiene en 5424 y 1 evoluciona al 6144.
+      + C09AA. Hay 106 pacientes, 86 se mantienen y 20 evoluciona. 
+      + C09XA. Hay 2 pacientes, 1 se mantiene y 1 evoluciona. 
+      
+  * Familia D. Solo hay un paciente que lo tome y ha evolucionado.
+
+  * Familia J. 
+      + J01DD. Solo hay 4 pacientes que lo tomen; 2 se han mantenido en el 5424 y 2 han evolucionado.
+      + J01XE. Solo hay 1 paciente y ha evolucionado.
+  
+  * Familia P. Solo hay un paciente que lo tome y se ha mantenido en el 5424.
+    
+  * Familia R. 
+      + R03BB. Solo hay doce pacientes que lo tomen (2 mantienen en 5424, 6 evolucionan al 6142, 2 evolucionan al 6141, uno evoluciona al 6111 y uno evoluciona 6120)
+      + R06AX. 191 pacientes, donde 136 se mantienen en 5424. 
+  
+<b>Resumen:</b>
+
+Parece que la variable realmente significante que se está usando para clasificar / predecir es la Edad. Por eso ese nivel tan bajo de Sensibilidad.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+rm(bucle)
+rm(size)
+rm(generarSanosDiabeticos)
+rm(generarEvolucion6144)
+rm(generarEvolucionTodos)
+rm(generarDiabeticos54246144)
+rm(resultado)
+rm(ficheros)
+rm(ficheroDestino)
+rm(ficheroFiltro)
+rm(ficheroSanos)
+```
+

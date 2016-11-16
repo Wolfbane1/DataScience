@@ -20,21 +20,15 @@ ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
 ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
-
-colorAnyo <- c("springgreen2", "turquoise")
-colorGenero <- c("slateblue3", "snow4")
-colorCRG <- c("thistle", 
-              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
-              "lemonchiffon", "red",       
-              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", "saddlebrown", 
-              "pink", "yellow", "olivedrab", "navajowhite")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
 
 source("analisisbasico.R")
 source("ac.R")
 
 #procesamos el CSV final.
 ficheros <- c(ficheroDestino, ficheroFiltro)
-csv <- procesaCSV(ficheros)
+csv <- procesaCSVDiabeticos(ficheros)
 
 rm(origenData)
 rm(origenMat)
@@ -967,20 +961,20 @@ for (anyo in unique(csv$Anyo)) {
     print(a)
     pintaNotaAnalisis(pintar, "H", anyo, 0, 0)
     
-    cat(paste("\n\n<b>Gráfico MAC.F.4.d", anyo, 
+    cat(paste("\n\n<b>Gráfico MAC.G.4.d", anyo, 
               " - A-Simétrico (relación no existencia ATC-Sexo)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
-            select.var = list(name=c("Sexo_1","Sexo_2", 
+            select.var = list(name=c("1","2", 
               "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0"))) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
                        [ATCs,Sexo]"))
     print(a)
     pintaNotaAnalisis(pintar, "I", anyo, 0, 0)
     
-    cat(paste("\n\n<b>Gráfico MAC.F.4.e", anyo, 
+    cat(paste("\n\n<b>Gráfico MAC.G.4.e", anyo, 
               " - A-Simétrico (relación existencia ATC-Sexo)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
-            select.var = list(name=c("Sexo_1","Sexo_2", 
+            select.var = list(name=c("1","2", 
               "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1"))) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
                        [ATCs,Sexo]"))

@@ -1,0 +1,319 @@
+---
+title: "Revisión Testeos significativos Wilcoxon en perfiles "
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+gficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
+
+source("analisisbasico.R")
+source("PCAs.R")
+
+#procesamos el CSV final.
+ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+csv <- procesaCSVDiabeticos(ficheros)
+#sanos <- procesaCSVSanos(ficheros)
+
+#liberación de variables
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheros)
+rm(ficheroSanos)
+rm(origenSanos)
+rm(ficheroNoTomanA10Destino)
+
+#Parámetros globales a usar
+longitud <- 1000
+tamaño <- 100
+crgs <- c(5424, 6144, 7071)
+bucle <- 10
+```
+
+#Wilcoxon: Contraste de distribuciones distintas para el perfil de la media de los ATCs
+
+Vamos a hacer el contraste de las hipótesis de Wilcoxon. Recordemos un poco de los resultados del test:
+
+- La hipótesis nula implica que las dos poblaciones siguen una distribución idéntica.
+
+- Todo valor p-value < 0.05 (valor significativo) implica que se puede rechazar la hipótesis nula. 
+
+Es decir, para todo valor de p-value < 0.05 se puede determinar que la distribución (en este caso el perfil de la media de los ATCs, es diferente para CRG en el que se encuentre el paciente.
+
+##Perfil global de la toma de ATCs
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("Se va a chequear el perfil global ")  
+  m <- matrix(nrow=0, ncol=10)
+  colnames(m) <- c("Tipo", "Iteracion", "Año", "Sexo", "CrgOrigen", "CrgDestino", 
+                   "ATC", "MediaCrg1", "MediaCrg2", "pValue")
+  
+  #Hacemos un bucle para iterar 10 veces  
+  for (i in 1:bucle) {
+    cat(paste("\n\n###Iteración - ", i, "\n\n", sep=""))
+ 
+    #En cada bucle plantamos una semilla nueva. 
+    set.seed(321*i)
+    
+    #Iteramos para cada año, sacaremos conclusiones por año y por crg.
+    for (anyo in unique(csv$Anyo) ) {
+      cat(paste("\n\n####Año ", anyo, " [Iteracion ", i, "]\n\n", sep=""))
+      salida <- list()
+      
+      for( crg in crgs ) {
+        matriz <- generaMatriz(csv, anyo, crg, longitud, tamaño)
+        media <- apply(matriz, 2, mean)
+ 
+        salida <- c(salida, list(matriz))
+      }
+      
+      #Ponemos las etiquetas de los elementos de la lista.
+      names(salida) <- c("CRG_5424", "CRG_6144", "CRG_7071")
+      
+      #Ahora tenemos que aplicar el Test de Wilcoxon para comparar:
+      # Perfil 5424 y Perfil 6144
+      res <- ejecutaWilcoxonCRGs(5424, 6144, salida$CRG_5424, salida$CRG_6144)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Todos", n), res))      
+      
+      # Perfil 5424 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(5424, 7071, salida$CRG_5424, salida$CRG_7071)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Todos", n), res))   
+      
+      # Perfil 6144 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(6144, 7071, salida$CRG_6144, salida$CRG_7071)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Todos", n), res))     
+    }  
+  }
+  
+  #Ajustamos los datos del DataFrame. 
+  #  pValue -> conversión a num. y los NaN (toda la distribución a 0) se pone a un valor alto.
+  #  resto de valores salvo ATC -> conversión a integer. 
+  m <- ajustaResultado(m)
+  
+  #Escribimos el resultado en el fichero de datos de salida.
+  fichero <- paste(salidaDatos, "global_perfil.csv", sep="")
+  write.csv(m, fichero, quote=FALSE)
+  
+  rm(anyo)
+  rm(crg)
+  rm(i)
+  
+  rm(matriz)
+  rm(fichero)
+  rm(media)
+  rm(salida)
+  rm(res)
+```
+
+##Perfil por Sexo de la toma de ATCs
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\nSe va a chequear el perfil por Sexo: Sexo_1 y Sexo_2.\n\n")  
+
+  #Parámetros a usar
+  m <- matrix(nrow=0, ncol=10)
+  colnames(m) <- c("Tipo", "Iteracion", "Año", "Sexo", "CrgOrigen", "CrgDestino", 
+                   "ATC", "MediaCrg1", "MediaCrg2", "pValue")
+  
+  #Hacemos un bucle para iterar 10 veces  
+  for (i in 1:bucle) {
+    cat(paste("\n\n###Iteración - ", i, "\n\n", sep=""))
+ 
+    #En cada bucle plantamos una semilla nueva. 
+    set.seed(321*i)
+    
+    #Iteramos para cada año, sacaremos conclusiones por año y por crg.
+    for (anyo in unique(csv$Anyo) ) {
+      cat(paste("\n\n####Año ", anyo, " [Iteracion ", i, "]\n\n", sep=""))
+      salida <- list()
+      
+      for( crg in crgs ) {
+        matriz_h <- generaMatrizSexo(anyo, crg, longitud, tamaño, 1)
+        matriz_m <- generaMatrizSexo(anyo, crg, longitud, tamaño, 2)
+ 
+        salida <- c(salida, list(matriz_h), list(matriz_m))
+      }
+      
+      #Ponemos las etiquetas de los elementos de la lista.
+      names(salida) <- c("CRG_5424_H", "CRG_5424_M", 
+                         "CRG_6144_H", "CRG_6144_M", 
+                         "CRG_7071_H", "CRG_7071_M")
+      
+      #Ahora tenemos que aplicar el Test de Wilcoxon para comparar:
+      ## HOMBRES
+      # Perfil 5424 y Perfil 6144
+      res <- ejecutaWilcoxonCRGs(5424, 6144, salida$CRG_5424_H, salida$CRG_6144_H)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_1", n), res))       
+      
+      # Perfil 5424 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(5424, 7071, salida$CRG_5424_H, salida$CRG_7071_H)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_1", n), res))      
+      
+      # Perfil 6144 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(6144, 7071, salida$CRG_6144_H, salida$CRG_7071_H)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_1", n), res)) 
+
+      ## MUJERES
+      # Perfil 5424 y Perfil 6144
+      res <- ejecutaWilcoxonCRGs(5424, 6144, salida$CRG_5424_M, salida$CRG_6144_M)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_2", n), res))     
+      
+      # Perfil 5424 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(5424, 7071, salida$CRG_5424_M, salida$CRG_7071_M)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_2", n), res))     
+      
+      # Perfil 6144 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(6144, 7071, salida$CRG_6144_M, salida$CRG_7071_M)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Global", n), rep(i, n), rep(anyo, n), rep("Sexo_2", n), res))
+    }  
+  }
+  
+  #Ajustamos los datos del DataFrame. 
+  #  pValue -> conversión a num. y los NaN (toda la distribución a 0) se pone a un valor alto.
+  #  resto de valores salvo ATC y Sexo -> conversión a integer. 
+  m <- ajustaResultado(m)
+  
+  #Escribimos el resultado en el fichero de datos de salida.
+  fichero <- paste(salidaDatos, "global_sexo_perfil.csv", sep="")
+  write.csv(m, fichero, quote=FALSE)
+  
+  rm(anyo)
+  rm(crg)
+  rm(i)
+  
+  rm(matriz_h)
+  rm(matriz_m)
+  rm(salida)
+  rm(fichero)
+  rm(res)
+```
+ 
+##Perfil por Sexo de la toma de ATCs para los pacientes que han evolucionado
+
+Ojo, en este apartado se contempla:
+- Pacientes que en 2011 estaban en 5424.
+- Pacientes que en 2012 siguen en 5424 o han evolucionado a 6144.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("###Perfil global de la toma de ATCs\n\n")
+  m <- matrix(nrow=0, ncol=10)
+  colnames(m) <- c("Tipo", "Iteracion", "Año", "Sexo", "CrgOrigen", "CrgDestino", 
+                   "ATC", "MediaCrg1", "MediaCrg2", "pValue")
+
+  #Hacemos un bucle para iterar 10 veces  
+  for (i in 1:bucle) {
+    cat(paste("\n\n####Iteración - ", i, "\n\n", sep=""))
+ 
+    #En cada bucle plantamos una semilla nueva. 
+    set.seed(321*i)
+
+    cat(paste("\n\n<b>Gráfico de Evolución de Patrón General</b>\n\n", sep=""))
+      matriz_e_5424 <- generaMatrizEvolucion(2012, 5424, longitud, tamaño)
+      matriz_e_6144 <- generaMatrizEvolucion(2012, 6144, longitud, tamaño)
+
+      # Perfil 5424 y Perfil 7071
+      res <- ejecutaWilcoxonCRGs(5424, 6144, matriz_e_5424, matriz_e_6144)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Evolucion", n), rep(i, n), rep(2012, n), rep("Todos", n), res))      
+  }
+
+  #Ajustamos los datos del DataFrame. 
+  #  pValue -> conversión a num. y los NaN (toda la distribución a 0) se pone a un valor alto.
+  #  resto de valores salvo ATC -> conversión a integer. 
+  m <- ajustaResultado(m)
+  
+  #Escribimos el resultado en el fichero de datos de salida.
+  fichero <- paste(salidaDatos, "evolucion_global_perfil.csv", sep="")
+  write.csv(m, fichero, quote=FALSE)
+   
+  rm(matriz_e_5424)
+  rm(matriz_e_6144)
+
+cat("###Perfil por Sexo de la toma de ATCs\n\n")
+  m <- matrix(nrow=0, ncol=10)
+  colnames(m) <- c("Tipo", "Iteracion", "Año", "Sexo", "CrgOrigen", "CrgDestino", 
+                   "ATC", "MediaCrg1", "MediaCrg2", "pValue")
+
+  #Hacemos un bucle para iterar 10 veces  
+  for (i in 1:bucle) {
+    cat(paste("\n\n####Iteración - ", i, "\n\n", sep=""))
+ 
+    #En cada bucle plantamos una semilla nueva. 
+    set.seed(321*i)
+
+    cat(paste("\n\n<b>Gráfico de Evolución de Patrón por Sexo == 1</b>\n\n", sep=""))
+      matriz_eh_5424 <- generaMatrizEvolucionSexo(2012, 5424, longitud, tamaño, 1)
+      matriz_em_5424 <- generaMatrizEvolucionSexo(2012, 5424, longitud, tamaño, 2)
+
+    cat(paste("\n\n<b>Gráfico de Evolución de Patrón por Sexo == 2</b>\n\n", sep=""))
+      matriz_eh_6144 <- generaMatrizEvolucionSexo(2012, 6144, longitud, tamaño, 1)
+      matriz_em_6144 <- generaMatrizEvolucionSexo(2012, 6144, longitud, tamaño, 2)
+
+    ## HOMBRES
+    # Perfil 5424 y Perfil 6144
+    res <- ejecutaWilcoxonCRGs(5424, 6144, matriz_eh_5424, matriz_eh_6144)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Evolucion", n), rep(i, n), rep(2012, n), rep("Sexo_1", n), res))  
+
+    ## MUJERES
+    # Perfil 5424 y Perfil 6144
+    res <- ejecutaWilcoxonCRGs(5424, 6144, matriz_em_5424, matriz_em_6144)
+      n <- nrow(res)
+      m <- rbind(m,cbind(rep("Evolucion", n), rep(i, n), rep(2012, n), rep("Sexo_2", n), res))    
+  }
+
+  #Ajustamos los datos del DataFrame. 
+  #  pValue -> conversión a num. y los NaN (toda la distribución a 0) se pone a un valor alto.
+  #  resto de valores salvo ATC y Sexo -> conversión a integer. 
+  m <- ajustaResultado(m)
+  
+  #Escribimos el resultado en el fichero de datos de salida.
+  fichero <- paste(salidaDatos, "evolucion_sexo_perfil.csv", sep="")
+  write.csv(m, fichero, quote=FALSE)
+
+  rm(matriz_eh_5424)
+  rm(matriz_eh_6144)
+  rm(matriz_em_5424)
+  rm(matriz_em_6144)
+  
+  rm(fichero)
+  rm(res)
+  rm(m)
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Eliminación de variables globales.
+rm(longitud)
+rm(tamaño)
+rm(crgs)
+rm(bucle)
+```

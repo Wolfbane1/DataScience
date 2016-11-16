@@ -11,6 +11,22 @@ library(MASS)                         #Librería para usar el Test de Wilcoxon.
 
 N <- 8
 
+colorAnyo <- c("springgreen2", "turquoise")
+colorGenero <- c("slateblue3", "snow4")
+colorGeneroSanos <- c("saddlebrown", "salmon2")
+colorCRG <- c("thistle", 
+              "green", "yellow4", "yellow4", "yellow4", "red1", "yellow4", "red2",
+              "slateblue", "red3",       
+              "yellow2", "green1", "green2", "green3", "yellow2", "yellow2", "yellow2", "red4", 
+              "blue", "darkblue", "darkgrey")
+colorCRGConSanos <- c("salmon1", "thistle", 
+              "green", "yellow4", "yellow4", "yellow4", "red1", "yellow4", "red2",
+              "slateblue", "red3",       
+              "yellow2", "green1", "green2", "green3", "yellow2", "yellow2", "yellow2", "red4", 
+              "blue", "darkblue", "darkgrey")
+salidaGrafica = "/Users/zzddfge/Desktop/Compartida/Proyecto_Master/graficas/"
+salidaDatos = "/Users/zzddfge/Desktop/Compartida/Proyecto_Master/salida_datos/"
+
 ####################################
 ## Función: estadisticos 
 #       --> Punto de entrada para ver los datos de un año concreto. 
@@ -363,9 +379,12 @@ obtieneRangoEdad <- function(tipo, csv) {
 ## Función: modificaDatos --> Punto centralizado en el código para que se puedan hacer transformaciones
 #                             sobre los datos, como por ejemplo, el ajuste en la edad del año 2012
 #                             que en los ficheros .mat recibidos venían con un dato menos.
+#  Parámetros:
+#    csv: Datos con los pacientes.
+#    ficheroFiltro: Fichero con los IDs que no están adscritos al hospital de fuenlabrada
+#    tipoPaciente: Si es diabético o es hipertenso por si hay que hacer ajustes distintos.
 #
-#
-modificaDatos <- function(csv, ficheroFiltro) {
+modificaDatos <- function(csv, ficheroFiltro, tipoPaciente, ejecutaAjustes = TRUE) {
   #FILTRO de datos.
   # Se tienen que filtrar los IDs que vienen en el fichero de Filtro porque son pacientes asociados a 
   # centros de salud no vinculados al HUF. Eso significa que no tenemos los ATCs de estos pacientes y
@@ -374,17 +393,30 @@ modificaDatos <- function(csv, ficheroFiltro) {
   filtro <- procesaFicheroFiltro(ficheroFiltro)
   csv <- csv[!csv$Id %in% filtro$Id, ]
   
-  #AJUSTES para 2011. 
-  # No se han detectado ajustes específicos a realizar en 2011.
+  if ( tipoPaciente == "Diabeticos" || tipoPaciente == "Sanos") {
+    if (ejecutaAjustes == TRUE ) {
+      #AJUSTES para 2011. 
+      # No se han detectado ajustes específicos a realizar en 2011.
+      
+      #AJUSTES para 2012.
+      # EDAD --> Todas las edades viene con un año menos por problemas en la generación. Se suma 1.
+      csv[csv$Anyo == 2012, "Edad"] <- csv[csv$Anyo == 2012, "Edad"] + 1
+      
+      # PACIENTE 16158224 --> Viene con Edad -17. Nació en 1929 por lo que su edad real en 2012 es 83 años.
+      csv[csv$Id == 16158224 & csv$Anyo == 2012, "Edad"] <- 83
+    }  
+  }else if (tipoPaciente == "Hipertensos" ) {
+    if (ejecutaAjustes == TRUE ) {
+      #AJUSTES para 2011. 
+      # No se han detectado ajustes específicos a realizar en 2011.
+      
+      #AJUSTES para 2012.
+      # EDAD --> Todas las edades viene con un año menos por problemas en la generación. Se suma 1.
+      csv[csv$Anyo == 2012, "Edad"] <- csv[csv$Anyo == 2012, "Edad"] + 1
+    }      
+  }
   
-  #AJUSTES para 2012.
-  # EDAD --> Todas las edades viene con un año menos por problemas en la generación. Se suma 1.
-    csv[csv$Anyo == 2012, "Edad"] <- csv[csv$Anyo == 2012, "Edad"] + 1
-  
-  # PACIENTE 16158224 --> Viene con Edad -17. Nació en 1929 por lo que su edad real en 2012 es 83 años.
-    csv[csv$Id == 16158224 & csv$Anyo == 2012, "Edad"] <- 83
-  
-    return(csv)
+  return(csv)
 }
 
 ####################################
@@ -400,25 +432,77 @@ procesaFicheroFiltro <- function(ficheroFiltro) {
 }
 
 ####################################
-## Función: procesaCSV --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
+## Función: procesaCSVSanos --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
 #                          lee el fichero y genera las columnas necesarias.
 #  Parámetros: 
 #     ficheros -> Vector de nombres de ficheros a tratar. La posición de los ficheros es:
 #        posición 1 --> Fichero CSV a leer con todos los datos. 
 #        posicion 2 --> Fichero CSV a leer con los Ids de los pacientes que no se deben tratar. 
+#        posicion 3 --> Fichero CSV con sanos
 #
-procesaCSV <- function(ficheros) {
+procesaCSVSanos <- function(ficheros) {
+  ficheroFiltro <- ficheros[2]
+  ficheroSanos <- ficheros[3]
   
+  ##SANOS  
+  #Lee el fichero de entrada. Se invoca a la función que aplica transformaciones sobre los CSV leídos.
+  csv2 <- modificaDatos( read.csv( ficheroSanos ), ficheroFiltro, "Sanos", ejecutaAjustes = TRUE)
+  
+  #Se añaden las columnas.
+  csv2 <- añadeColumnas(csv2)
+  
+  #Filtro global.
+  csv2 <- filtroGlobal(csv2)
+  
+  return (csv2)
+}
+
+####################################
+## Función: procesaCSVEnfermo --> Dado un nombre de fichero de destino (con la estructura CSV esperada)
+#                          lee el fichero y genera las columnas necesarias.
+#  Parámetros: 
+#     ficheros -> Vector de nombres de ficheros a tratar. La posición de los ficheros es:
+#        posición 1 --> Fichero CSV a leer con todos los datos. 
+#        posicion 2 --> Fichero CSV a leer con los Ids de los pacientes que no se deben tratar. 
+#        posicion 3 --> Fichero CSV con sanos
+#     tipoPaciente -> Si son pacientes Hipertensos o Diabéticos
+procesaCSVEnfermos <- function(ficheros, tipoPaciente) {
   ficheroDestino <- ficheros[1]
   ficheroFiltro <- ficheros[2]
   
+  ##DIABETICOS  
+  #Lee el fichero de entrada. Se invoca a la función que aplica transformaciones sobre los CSV leídos.
+  csv <- modificaDatos(read.csv( ficheroDestino), ficheroFiltro, tipoPaciente)
+  
+  #Se añaden las columnas.
+  csv <- añadeColumnas(csv)
+  
+  #Filtro global.
+  csv <- filtroGlobal(csv)
+  
+  return (csv)
+}
+
+####################################
+## Función: filtroGlobal --> Añadimos filtros globales que aplican a todos los años.
+#
+#
+filtroGlobal <- function(csv) {
+
+  #AJUSTES GLOBALES
+  # ELIMINAR PACIENTES CON TODOS ATCs a 0's.
+  csv <- csv[csv$totalATCTodos > 0, ]
+  return (csv)
+}
+
+####################################
+## Función: añadeColumnas --> Se añaden las columnas necesarias sobre el resumen de los ATCs.
+#
+#
+añadeColumnas <- function(csv) {
   #Códigos ATC para diabéticos.
   ATCsDiabeticos <- c("A10AB","A10AC","A10AD","A10AE","A10AF","A10BA","A10BB","A10BC","A10BD","A10BF","A10BG","A10BH","A10BX","A10XA")
   cat(paste("Medicamentos que se consideran como ATCs para Diabéticos:"), imprime(ATCsDiabeticos), "\n\n", sep="")
-  
-  #Lee el fichero de entrada. Se invoca a la función que aplica transformaciones sobre los CSV leídos.
-  #csv <- read.csv( ficheroDestino, nrows=100 )
-  csv <- modificaDatos(read.csv( ficheroDestino), ficheroFiltro)
   
   #PUNTO 1: Se añaden variables "factor".
   #Variables categóricas: Se generan las variables categóricas a partir de los daots del fichero:
@@ -437,7 +521,7 @@ procesaCSV <- function(ficheros) {
   
   csv <- cbind(csv, apply(csv[, colnames(csv) %in% setdiff(colnames(csv)[7:752], ATCsDiabeticos)], 1, sum))
   colnames(csv)[756] <- "totalATCOtros"
-
+  
   csv <- cbind(csv, apply(csv[, colnames(csv)[7:752]], 1, sum))
   colnames(csv)[757] <- "totalATCTodos"
   
@@ -460,14 +544,14 @@ procesaCSV <- function(ficheros) {
   #warning(paste(av, "\n"))
   
   #csv <- csv[,-c(atcsVacios)]
-  
   #Eliminación de las variables creadas
   rm(av)
   rm(atcsVacios)
   rm(ATCsDiabeticos)
   
-  return (csv)
+  return(csv)
 }
+
 
 ####################################
 ## Función: estadisticosId --> Pretendemos hacer un análisis estadístico sencillo y básico sobre
@@ -719,4 +803,817 @@ cuentaCRGAño <- function(csv) {
   
   #Se devuelve la cuenta.
   return(c)
+}
+
+## Función: IC_low
+#  Devuelve el valor mínimo de un intervalo de confianza, asumiendo que tiene dos colas. 
+#  
+#
+IC_low <- function(X) {
+  quantile(X, 0.025)
+}
+
+## Función: IC_low
+#  Devuelve el valor máximo de un intervalo de confianza, asumiendo que tiene dos colas. 
+#  
+#
+IC_high <- function(X) {
+  quantile(X, 0.975)
+}
+
+## Función: generaMatriz
+#  Función que genera una matriz de lon filas donde cada fila es la media de una muestra seleccionada
+#  de forma aleatoria y sin elementos de repetición.
+#  
+#
+generaMatriz <- function(csv, anyo, crg, lon, size) {
+  #selección de anyo, crg, variables y obtener el id para el muestreo y el sexo para las gráficas.
+  atc <- subset(csv, csv$Anyo == anyo & csv$CRG==crg, c(1,2,6,7:(ncol(csv) - N)))
+  Id <- atc[,1]
+  Sexo <- atc[,2]
+  atc <- atc[,c(-1,-2,-3)]
+  
+  #Convertimos en matriz de existencia.
+  t <- as.data.frame(apply(atc, 2, convierteExistencia))
+  matriz <- matrix(nrow=0, ncol=length(t))
+  
+  #Añadimos el Id para el muestreo.
+  t <- as.data.frame(cbind(Id, Sexo, t))
+  
+  #Ejecutamos lon veces el muestreo y calculamos la media de cada muestreo.
+  for(i in 1:lon) {
+    #Ajustamos el tamaño al 80% de lo que tenga un crg dado si no llega al tamaño especificado.
+    size <- ifelse(length(Id) < size, length(Id)*0.8, size)
+    
+    Id_s <- sample(Id, size=size, replace=FALSE)
+    t_b <- subset(t, t$Id %in% Id_s, c(-1, -2))
+    
+    media <- apply(t_b, 2, mean)
+    matriz <- rbind(matriz, media)
+  }
+  
+  t <- t[,c(-1,-2)]
+  colnames(matriz) <- colnames(t)
+  rownames(matriz) <- c()
+  matriz <- as.data.frame(matriz)
+  
+  return(matriz)
+}
+
+## Función: generaMatrizSexo
+#  Función que genera una matriz de lon filas donde cada fila es la media de una muestra seleccionada
+#  de forma aleatoria y sin elementos de repetición. La selección de elementos es de forma aleatoria
+#  pero luego se filtra por aquellos que corresponden al sexo especificado como parámetro.
+#
+generaMatrizSexo <- function(anyo, crg, lon, size, sexo) {
+  #selección de anyo, crg, variables y obtener el id para el muestreo y el sexo para las gráficas.
+  atc <- subset(csv, csv$Anyo == anyo & csv$CRG==crg, c(1,2,6,7:(ncol(csv) - N)))
+  Id <- atc[,1]
+  Sexo <- atc[,2]
+  atc <- atc[,c(-1,-2,-3)]
+  
+  #Convertimos en matriz de existencia.
+  t <- as.data.frame(apply(atc, 2, convierteExistencia))
+  matriz <- matrix(nrow=0, ncol=length(t))
+  
+  #Añadimos el Id para el muestreo.
+  t <- as.data.frame(cbind(Id, Sexo, t))
+  
+  #Ejecutamos lon veces el muestreo y calculamos la media de cada muestreo.
+  for(i in 1:lon) {
+    #Ajustamos el tamaño al 80% de lo que tenga un crg dado si no llega al tamaño especificado.
+    size <- ifelse(length(Id) < size, length(Id)*0.8, size)
+    
+    Id_s <- sample(Id, size=size, replace=FALSE)
+    t_b <- subset(t, t$Id %in% Id_s & t$Sexo == sexo, c(-1, -2))
+    
+    media <- apply(t_b, 2, mean)
+    matriz <- rbind(matriz, media)
+  }
+  
+  t <- t[,c(-1,-2)]
+  colnames(matriz) <- colnames(t)
+  rownames(matriz) <- c()
+  matriz <- as.data.frame(matriz)
+  
+  return(matriz)
+}
+
+## Función: generaMatriz
+#  Función que genera una matriz de lon filas donde cada fila es la media de una muestra seleccionada
+#  de forma aleatoria y sin elementos de repetición. Para seleccionar los elementos 
+#  
+#
+generaMatrizEvolucion <- function(anyo, crg, lon, size) {
+  #selección de anyo, crg, variables y obtener el id para el muestreo y el sexo para las gráficas.
+  IdEvolucion <- getIds2011CRGs2012(csv)
+  atc <- subset(csv, csv$Id %in% IdEvolucion$Id & csv$Anyo == anyo & csv$CRG==crg, c(1,2,6,7:(ncol(csv) - N)))
+  Id <- atc[,1]
+  Sexo <- atc[,2]
+  atc <- atc[,c(-1,-2,-3)]
+  
+  #Convertimos en matriz de existencia.
+  t <- as.data.frame(apply(atc, 2, convierteExistencia))
+  matriz <- matrix(nrow=0, ncol=length(t))
+  
+  #Añadimos el Id para el muestreo.
+  t <- as.data.frame(cbind(Id, Sexo, t))
+  
+  #Ejecutamos lon veces el muestreo y calculamos la media de cada muestreo.
+  for(i in 1:lon) {
+    Id_s <- sample(Id, size=size, replace=FALSE)
+    #t_b <- subset(t, t$Id %in% Id_s & t$Sexo == sexo, c(-1, -2))
+    t_b <- subset(t, t$Id %in% Id_s, c(-1, -2))
+    
+    media <- apply(t_b, 2, mean)
+    matriz <- rbind(matriz, media)
+  }
+  
+  t <- t[,c(-1,-2)]
+  colnames(matriz) <- colnames(t)
+  rownames(matriz) <- c()
+  matriz <- as.data.frame(matriz)
+  
+  return(matriz)
+}
+
+getIds2011CRGs2012 <- function(csv, listaCRG = c(5424, 6144, 7071)) {
+  #Vamos a calcular los pacientes que son comunes en 2011 y en 2012.
+  d11 <- subset(csv, csv$Anyo == 2011)
+  d12 <- subset(csv, csv$Anyo == 2012)
+  
+  #Vemos los pacientes que están en 2011 y en 2012.
+  Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+  n <- nrow(Si_2011_Si_2012)
+  Si_2011_Si_2012 <- cbind(Si_2011_Si_2012, rep(0, n), rep(0, n), rep(0, n), rep(0, n))
+  colnames(Si_2011_Si_2012) <- c("Id", "Sexo_11", "Edad_11", "CRG_11", "Id_12", "Sexo_12", "Edad_12", "CRG_12")
+  
+  for (i in 1:nrow(Si_2011_Si_2012) ) {
+    Si_2011_Si_2012[i, c("Id_12", "Sexo_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Sexo", "Edad", "CRG")]
+  }
+  rm(i)
+  rm(d11)
+  rm(d12)
+  
+  if ( is.null(listaCRG) == TRUE ) {
+    Ids <- subset(Si_2011_Si_2012, Si_2011_Si_2012$CRG_11 == 5424, c(Id))
+  } else {
+    Ids <- subset(Si_2011_Si_2012, 
+                  Si_2011_Si_2012$CRG_11 == 5424 & Si_2011_Si_2012$CRG_12 %in% listaCRG, 
+                  c(Id))
+  }
+
+  return(Ids)
+}
+
+generaMatrizEvolucionSexo <- function(anyo, crg, lon, size, sexo) {
+  #selección de anyo, crg, variables y obtener el id para el muestreo y el sexo para las gráficas.
+  IdEvolucion <- getIds2011CRGs2012(csv)
+  atc <- subset(csv, csv$Id %in% IdEvolucion$Id & csv$Anyo == anyo & csv$CRG==crg, c(1,2,6,7:(ncol(csv) - N)))
+  Id <- atc[,1]
+  Sexo <- atc[,2]
+  atc <- atc[,c(-1,-2,-3)]
+  
+  #Convertimos en matriz de existencia.
+  t <- as.data.frame(apply(atc, 2, convierteExistencia))
+  matriz <- matrix(nrow=0, ncol=length(t))
+  
+  #Añadimos el Id para el muestreo.
+  t <- as.data.frame(cbind(Id, Sexo, t))
+  
+  #Ejecutamos lon veces el muestreo y calculamos la media de cada muestreo.
+  for(i in 1:lon) {
+    Id_s <- sample(Id, size=size, replace=FALSE)
+    t_b <- subset(t, t$Id %in% Id_s & t$Sexo == sexo, c(-1, -2))
+    
+    media <- apply(t_b, 2, mean)
+    matriz <- rbind(matriz, media)
+  }
+  
+  t <- t[,c(-1,-2)]
+  colnames(matriz) <- colnames(t)
+  rownames(matriz) <- c()
+  matriz <- as.data.frame(matriz)
+  
+  return(matriz)
+}
+
+## Función: ejecutaWilcoxon
+#  Dada dos matrices con los 746s ATCs, ejecutamos el método para identificar aquellos ATCs que tienen una distribución
+#  distinta. El resultado lo añade a la matriz m de resultados y devuelve la matriz.
+#  
+#
+ejecutaWilcoxonCRGs <- function(crg1, crg2, atcs_crg1, atcs_crg2) {
+  #Matriz para almacenar el resultado.
+  m <- matrix(nrow=0, ncol=6)
+  colnames(m) <- c("CrgOrigen", "CrgDestino", "ATC", "MediaCrg1", "MediaCrg2", "pValue")
+  
+  #Iteramos para cada ATC.
+  for (atc in colnames(atcs_crg1)) {
+    suppressWarnings(res <- wilcox.test(atcs_crg1[,atc], atcs_crg2[,atc]))
+    a <- matrix(nrow=1, ncol=6, c(crg1, crg2, atc, 
+                                  round(mean(atcs_crg1[,atc]),4), round(mean(atcs_crg2[,atc]),4),
+                                  round(res$p.value, 4)))
+    m <- rbind(m, a)
+  }
+  
+  rm(atc)
+  rm(res)
+  rm(a)
+
+  return(m)
+}
+
+ajustaResultado <- function(m) {
+  m <- as.data.frame(m)
+  m$pValue <- ifelse(m$pValue == "NaN", 1000, as.numeric(as.character(m$pValue),4))
+  m$MediaCrg1 <- as.numeric(as.character(m$MediaCrg1), 4)
+  m$MediaCrg2 <- as.numeric(as.character(m$MediaCrg2), 4)
+  m$Iteracion <- as.integer(as.character(m$Iteracion))
+  m$CrgOrigen <- as.integer(as.character(m$CrgOrigen))
+  m$CrgDestino <- as.integer(as.character(m$CrgDestino))
+  m$Tipo <- as.character(m$Tipo)
+  m$Año <- as.integer(as.character(m$Año))
+  
+
+  return(m)  
+}
+
+
+################
+### Funciones para hacer más legible el fichero graficosMemoria.rmd
+### Básicamente las funciones que pintan los gráficos. 
+################
+
+getDatosPacientesCoincidentes <- function(csv) {
+  #Vamos a calcular los pacientes que son comunes en 2011 y en 2012.
+  d11 <- subset(csv, csv$Anyo == 2011)
+  d12 <- subset(csv, csv$Anyo == 2012)
+
+  #Vemos los pacientes que están en 2011 y en 2012.
+  Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+  n <- nrow(Si_2011_Si_2012)
+  Si_2011_Si_2012 <- cbind(Si_2011_Si_2012, rep(0, n), rep(0, n), rep(0, n), rep(0, n))
+  colnames(Si_2011_Si_2012) <- c("Id", "Sexo_11", "Edad_11", "CRG_11", "Id_12", "Sexo_12", "Edad_12", "CRG_12")
+  
+  for (i in 1:nrow(Si_2011_Si_2012) ) {
+    Si_2011_Si_2012[i, c("Id_12", "Sexo_12", "Edad_12", "CRG_12")] <- d12[d12$Id == Si_2011_Si_2012[i,"Id"], c("Id", "Sexo", "Edad", "CRG")]
+  }
+  rm(i)
+  rm(d11)
+  rm(d12)
+  rm(n)
+
+  return(Si_2011_Si_2012)
+}
+
+calculaPacientesCoincidencias <- function(csv) {
+  #Vamos a calcular los pacientes que son comunes en 2011 y en 2012.
+  d11 <- subset(csv, csv$Anyo == 2011)
+  d12 <- subset(csv, csv$Anyo == 2012)
+  
+  #Vemos los pacientes que están en 2011 y en 2012.
+  Si_2011_Si_2012 <- d11[d11$Id %in% d12$Id, c("Id","Genero", "Edad", "CRG")]
+  n <- nrow(Si_2011_Si_2012)
+
+  rm(d11)
+  rm(d12)
+  
+  return(n)
+}
+
+pintaGrafica1 <- function(csv, tipoPaciente) {
+  n <- calculaPacientesCoincidencias(csv)
+  Anyo <- factor(csv$Anyo)
+  cuentas <- suppressMessages(sqldf("select Anyo, count(*) as total from csv group by Anyo"))
+  max <- max(cuentas$total)
+  plot(Anyo, xlab="Año", ylab="Número de pacientes", ylim=c(0, max+300), col=colorAnyo)
+  title(main=paste("Distribución datos por Año:", tipoPaciente), cex.main=0.7)
+  text(1, max, labels=c(cuentas[1,2]), adj=0.5, font=4, cex=0.9)
+  text(2, max, labels=c(cuentas[2,2]), adj=0.5, font=4, cex=0.9)
+  abline(h=n, lwd=3, col="red")
+  text(1, n+0.05*n, paste(n, " pacientes coincidentes."), col="red", cex = 0.7)
+  
+  rm(Anyo)
+  rm(max)
+  rm(n)
+}
+
+pintaGrafica2a <- function(csv, tipoPaciente) {
+  #Sacamos las gráficas de distribución por Edad.
+  i <- 1 
+  for (anyo in unique(csv$Anyo)) {
+    t <- table(subset(csv$Edad, csv$Anyo==anyo))
+    plot(t, xlab = "Edad", ylab="Número de Pacientes", cex.axis = 0.7, type="h", col=colorAnyo[i])
+    title(main=paste("Distribución de Edad en ", anyo, " (", tipoPaciente, ")", sep=""), cex.main=0.7)
+    i<- i + 1
+  }
+  
+  rm(i)
+  rm(t)
+  rm(anyo)
+}
+
+pintaGrafica3a <- function(csv, tipoPaciente) {
+  cuentas <- sqldf("select Anyo, Sexo, count(*) as total from csv group by Anyo, Sexo")
+  i <- 1
+  for (anyo in unique(csv$Anyo)) {
+    barplot(table(subset(csv$Sexo, csv$Anyo==anyo)), col=colorGenero, width = 21, 
+            cex.names = 0.7, cex.axis = 0.7, 
+            xlab = "Sexo", ylab="Número de Pacientes", ylim=c(0, max(cuentas$total)+100))
+    title(main=paste("Distribución de Sexo en ", anyo, " (", tipoPaciente, ")",
+                     ". Total Pacientes = ", cuentas[i,3] + cuentas[i+1,3], sep=""), cex.main=0.7)
+    text(14, 3000, labels=c(cuentas[i,3]), adj=0.5, font=4, cex=0.9)
+    text(40, 3000, labels=c(cuentas[i+1,3]), adj=0.5, font=4, cex=0.9)
+    i <- i + 2
+  }
+  rm(cuentas)
+  rm(i)
+  rm(anyo)
+}
+
+pintaGrafica3b <- function(diab, sanos) {
+  cuentas <- sqldf("select Anyo, Edad, Sexo, count(*) as total from csv group by Anyo, Edad, Sexo")
+  cuentasSanos<- sqldf("select Anyo, Edad, Sexo, count(*) as total from sanos group by Anyo, Edad, Sexo")
+  for (anyo in unique(cuentas$Anyo)) {
+    d <- subset(cuentas, cuentas$Anyo==anyo)
+    s <- subset(cuentasSanos, cuentasSanos$Anyo==anyo)
+    plot(subset(s, Sexo==2)$Edad, subset(s, Sexo==2)$total, 
+         xlab = "Edad", ylab="Número de Pacientes", 
+         cex.axis = 0.7, type="l", col=colorGeneroSanos[2], xaxt="n")
+    lines(subset(s, Sexo==1)$Edad, subset(s, Sexo==1)$total, col=colorGeneroSanos[1])
+    lines(subset(d, Sexo==1)$Edad, subset(d, Sexo==1)$total, col=colorGenero[1])
+    lines(subset(d, Sexo==2)$Edad, subset(d, Sexo==2)$total, col=colorGenero[2])
+    title(main=paste("Distribución de Edad y Género para ", anyo, sep=""), cex.main=0.7)
+    legend("topright", ncol=2, legend = c("Género 1", "Género 2", "Género 1", "Género 2"), 
+           title ="Sanos / Diabéticos", fill=c(colorGeneroSanos, colorGenero))
+    axis(1,  at = unique(d$Edad), labels=unique(d$Edad), cex.axis=0.7)
+  }
+  rm(anyo)
+  rm(cuentas)
+  rm(cuentasSanos)
+  rm(s)
+  rm(d)
+}
+
+pintaGrafica4a <- function(csv) {
+  cuentas <- cuentaCRGAño(csv)
+  j <- 0
+  for ( anyo in unique(csv$Anyo)) {
+    d <- subset(cuentas, Anyo == anyo)
+    suma <- sum(d$total)
+    barplot(d$total, horiz=TRUE, beside = TRUE, las = 2, cex.names=0.7, cex.axis=0.7,col=colorCRG,
+            names=as.character(factor(d$CRG)))
+    title(paste(main="Distribución de Pacientes por CRG-base en ", anyo, sep=""), cex.main=0.7)
+    for (i in 1:nrow(d)) {
+      text(1900, i+(i-1)*0.2-0.5, 
+           labels=c(paste(d[i,3], " [", round(100*d[i,3]/suma,2), "%]",sep="")), 
+           adj=0.5, font=4, cex=0.6)
+    }
+    j<- j + 1
+  }
+  rm(i)
+  rm(j)
+  rm(d)
+  rm(anyo)
+  rm(suma)
+  rm(cuentas)
+}
+
+pintaGrafica4b <- function(csv) {
+  for (anyo in unique(csv$Anyo)) {
+    cat(paste("\n\n <b>Año ", anyo, "</b>\n\n", sep=""))
+    
+    #Buscamos conseguir la lista de colores que tenemos que mostrar: 
+    #rojo para indicar que es significativo, negro para indicar que no.
+    color <- c()
+    cat("\n\n--> Ejecución de los Test de Wilcoxon con p-value < 0.05 \n\n")
+    for (i in unique(csv[csv$Anyo == anyo, "nivel"])) {
+      cb <- "black"
+      mu1 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 1)
+      mu2 <- subset(csv$Edad, csv$Anyo == anyo & csv$nivel==i & csv$Genero == 2)
+      
+      if (length(mu1) > 4 & length(mu2) > 4 ) {
+        suppressWarnings(prueba <- wilcox.test(mu1, mu2))
+        if (round(prueba$p.value, 2) < 0.05 ) {
+          cb <- ifelse(length(mu1) <= 100 | length(mu2) <= 100, "red", "blue")
+        }
+        
+        #Imprimimos para ver todos los resultados.
+        cat(red(paste("\t\tCRG-base = ", i, ", p-Value: ", round(prueba$p.value, 5), 
+                      ", Género 1: ", length(mu1), ", Género 2: ", length(mu2), "\n\n", sep="")))
+      }
+      color <- c(color, cb)
+    }
+    
+    csv2 <- subset(csv, csv$Anyo == anyo)
+    g <- ggplot(csv2, aes(x=nivel, y=Edad, fill=Genero)) + geom_boxplot(notch=TRUE) + 
+      scale_fill_manual(values=colorGenero) +
+      theme(axis.text.x = element_text(size = 7, colour = color)) + 
+      theme(title = element_text(size = 7, colour = "black")) + 
+      labs(x="CRG-base", y="Edad",
+           title=paste("Distribución de pacientes según CRG-base y Sexo en ", anyo, sep=""))
+    suppressMessages(print(g))
+  }
+  
+  rm(anyo)
+  rm(color)
+  rm(cb)
+  rm(mu1)
+  rm(mu2)
+  rm(prueba)
+  rm(csv2)
+  rm(g)
+  rm(i)
+}
+
+pintaGraficasATCs <- function(d) {
+  for (anyo in unique(d$Anyo)) {
+    #Generamos título Nivel 2
+    cat(paste("###Año ", anyo, "\n\n"))
+    
+    #Generamos el conjunto de datos.
+    dx <- eliminaATCsVacios(d, anyo, 7:(ncol(d)-N))
+    
+    #Generamos las familias
+    m_cuentaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "CUENTA_FAMILIAS")
+    m_sumaFamilias <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "SUMA_FAMILIAS")
+    m_existeFamilia <- reduceMatrizATC(dx, 7:(ncol(dx)-N), 1, "EXISTENCIA")
+    
+    #Generamos el gráfico de Existencia.
+    cat("####Análisis de Existencia \n\n")
+    m <- calculaBurbujaATC(dx, m_existeFamilia)
+    
+    #Pintamos el gráfico. 
+    cat(paste("\n\n<b>Gráfica ATC.1.", anyo, " - Distribución de Existencia por CRG en la toma de ATC</b>\n\n", sep=""))
+    g <- ggplot(m, aes(x=ATC, y=CRG_base, size = Total)) + geom_point(shape=21, aes(fill=CRG_base)) + 
+      scale_fill_manual("CRG-base", values=colorCRGConSanos) +
+      scale_size("Número") + 
+      theme(axis.text.x = element_text(size = 8, colour = "black")) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+      labs(x="ATC", y="CRG-base", 
+           title="Existencia de toma de grupo de Familia ATC por CRG")
+    print(g)
+    cat("\n\n")
+    
+    #Generamos el gráfico de Cuentas.
+    cat("####Análisis de Cuentas\n\n")
+    
+    #Generamos el dato definitivo
+    m <- calculaBurbujaATC(dx, m_cuentaFamilias)
+    
+    #Pintamos el gráfico. 
+    cat(paste("\n\n<b>Gráfica ATC.2.", anyo, " - Distribución de Existencia por CRG en la toma de ATC></b>\n\n", sep=""))
+    g <- ggplot(m, aes(x=ATC, y=CRG_base, size = Total)) + geom_point(shape=21, aes(fill=CRG_base)) + 
+      scale_fill_manual("CRG-base", values=colorCRGConSanos) +
+      scale_size("Número") + 
+      theme(axis.text.x = element_text(size = 8, colour = "black")) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+      labs(x="ATC", y="CRG-base", 
+           title="Cuenta de medicamentos distintos de grupo de Familia ATC por CRG")
+    print(g)
+    cat("\n\n")
+    
+    #Generamos el gráfico de Suma
+    cat("####Análisis de Sumas\n\n")
+    
+    #Generamos el dato definitivo
+    m <- calculaBurbujaATC(dx, m_sumaFamilias)
+    
+    #Pintamos el gráfico. 
+    cat(paste("\n\n<b>Gráfica ATC.3.", anyo, " - Distribución de Existencia por CRG en la toma de ATC></b>\n\n", sep=""))
+    g <- ggplot(m, aes(x=ATC, y=CRG_base, size = Total)) + geom_point(shape=21, aes(fill=CRG_base)) + 
+      scale_fill_manual("CRG-base", values=colorCRGConSanos) +
+      scale_size("Número") + 
+      theme(axis.text.x = element_text(size = 8, colour = "black")) + 
+      theme(title = element_text(size = 8, colour = "black")) + 
+      theme(legend.text = element_text(size = 6)) + 
+      theme(legend.key.height = unit (0.4, "cm")) + 
+      labs(x="ATC", y="CRG-base", 
+           title="Suma total de medicamentos por grupo de Familia ATC y por CRG")
+    print(g)
+    
+    cat("\n\n\n")
+  }
+  
+  rm(dx)
+  rm(m_cuentaFamilias)
+  rm(m_sumaFamilias)
+  rm(m_existeFamilia)
+  rm(m)
+  rm(g)
+  rm(anyo)
+}
+
+pintaGraficasPerfilesZoom <- function(csv, lineas, tipo) {
+  m <- matrix(nrow=0, ncol=4)
+  
+  #Iteramos por año.
+  for (anyo in unique(csv$Anyo)) {
+    #Generamos título Nivel 2
+    cat(paste("\n\n###Año ", anyo, "\n\n"))
+    
+    #Generamos el gráfico para cada CRG.
+    cat("####Generacíon de gráficas individuales por CRG-base\n\n")
+    
+    atc <- subset(csv, csv$Anyo == anyo)
+    atc <- atc[,c(6,7:(ncol(atc) - N))]
+    i <- 1
+    par(mfrow=c(2,1), mar=c(3,2,3,2))
+    for (crg in unique(atc$CRG)) {
+      cat(paste("\n\n<b>Gráfica ATC.CRG.", i, ".", anyo, ": ", crg, 
+                " - Distribución de la Proporción de la toma de ATCs",
+                ", Número de pacientes: ", length(atc[atc$CRG==crg, "CRG"]), "</b>\n\n", sep=""))
+      
+      #Filtramos por el ATC
+      atc_crg <- subset(atc, atc$CRG == crg)
+      atc_crg <- atc_crg[,-1]
+      
+      #Sumamos el total de las dispensaciones.
+      if (tipo == 1) {
+        atc_col <- 100*apply(atc_crg, 2, sum)/sum(atc_crg)
+      }else if (tipo == 2) {
+        t <- apply(atc_crg, 2, convierteExistencia)
+        atc_col <- 100*apply(t, 2, sum)/nrow(t) 
+        rm(t)
+      }
+      p <- atc_col
+      n <- names(atc_col)
+      a <- rep(anyo, length(p))
+      c <- rep(crg, length(p))
+      m <- rbind(m, cbind(a, c, n, p))
+      rownames(m) <- c()
+      
+      label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+      pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+      
+      #Pintamos la gráfica de perfil.
+      plot(atc_col, type = "l", cex.axis = 0.7, xaxt="n", 
+           col=colorCRGConSanos[i], 
+           xlab = "ATCs", ylab="Ocurrencia")
+      axis(1, at=pos, labels= label, cex.axis = 0.5)
+      title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC", sep=""), 
+            cex.main=0.65)
+      
+      #Pintamos la gráfica de ZOOM
+      plot(atc_col[atc_col >= quantile(atc_col, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+           col=colorCRGConSanos[i], 
+           xlab = "ATCs", ylab="Ocurrencia")
+      points(atc_col[atc_col >= quantile(atc_col, 0.96)], pch=19)
+      axis(1, at=1:length(names(atc_col[atc_col >= quantile(atc_col, 0.96)])), 
+           labels=names(atc_col[atc_col >= quantile(atc_col, 0.96)]), cex.axis = 0.5, las=3)
+      title(main=paste("ZOOM: ATCs con mayor Ocurrencia", sep=""), 
+            cex.main=0.65)
+      abline(h=lineas[1], col="red")
+      abline(h=lineas[2], col="red")
+      abline(h=lineas[3], col="red") 
+      i <- i + 1
+    }
+  }
+  
+  rm(atc_crg)
+  rm(atc_col)
+  rm(atc)
+  rm(i)
+  rm(crg)
+  rm(anyo)
+  rm(label)
+  rm(pos)
+  rm(p)
+  rm(n)
+  rm(a)
+  rm(c)
+  
+  #Una vez que se ha finalizado la ejecución para los años, obtenemos los valores mayores.
+  m <- as.data.frame(cbind(m, as.character(m[,2])))
+  colnames(m) <- c("Anyo", "CRG", "Names", "Prob", "PosX")
+  m$Anyo <- as.factor(m$Anyo)
+  m$CRG <- as.factor(m$CRG)
+  m$Prob <- round(as.numeric(as.character(m$Prob)), 4)
+  
+  return (m)
+}
+
+pintaGráficaCristina <- function(atc, m, etiquetas, tipo) {
+  m$PosX <- ifelse(m$CRG == 0, 1, m$PosX)
+  m$PosX <- ifelse(m$CRG == 5424, 2, m$PosX)
+  m$PosX <- ifelse(m$CRG == 6144, 3, m$PosX)
+  m$PosX <- ifelse(m$CRG == 7071, 4, m$PosX)
+  
+  
+  #Ahora hay que concatenar las columnas que no estén en los otros CRGs y que estén en el previo.
+  u <- unique(atc[atc$CRG != 0, "Names"])
+  atc_f <- subset(m, m$CRG %in% c(0, 5424, 6144, 7071) & m$Names %in% u)
+  
+  par(mfrow=c(1,2), mar=c(3,2,3,2))
+  for (anyo in unique(m$Anyo)) {
+    t <- subset(atc_f, atc_f$Anyo==anyo)
+    t$CRG <- as.integer(as.character(t$CRG))
+    t$Prob <- as.numeric(t$Prob)
+    
+    t0 <- subset(t, t$CRG==0)
+    t5424 <- subset(t, t$CRG==5424)
+    t6144 <- subset(t, t$CRG==6144)
+    t7071 <- subset(t, t$CRG==7071)
+    plot(t0$PosX, t0$Prob*2, type ="p", ylim=c(0, max(atc_f$Prob)*2), xlim=c(0.5, 4.5), yaxt="n", xaxt="n", pch=0)
+    points(t5424$PosX, t5424$Prob*2, pch=1)
+    points(t6144$PosX, t6144$Prob*2, pch=5)
+    points(t7071$PosX, t7071$Prob*2, pch=2)
+    axis(1,  at = unique(t$PosX), labels=unique(t$CRG), cex.axis=0.6)
+    axis(2, at = etiquetas*2, 
+         labels=etiquetas, cex.axis=0.6)
+    title(main=paste("Año ", anyo, " - Evolución de ATCs por CRG-base", sep=""), cex.main=0.7)
+    if (tipo == 1 ) pintaSegmentos1(t0, t5424, t6144, t7071)
+    if (tipo == 2 ) pintaSegmentos2(t0, t5424, t6144, t7071)
+  }
+  
+  rm(t5424)
+  rm(t6144)
+  rm(t7071)
+  rm(t0)
+  rm(u)
+  rm(atc)
+  rm(atc_f)
+}
+
+pintaGráficaCristinaHipertension <- function(atc, m, etiquetas, tipo) {
+  m$PosX <- ifelse(m$CRG == 0, 1, m$PosX)
+  m$PosX <- ifelse(m$CRG == 5190, 2, m$PosX)
+  m$PosX <- ifelse(m$CRG == 6124, 3, m$PosX)
+  m$PosX <- ifelse(m$CRG == 6144, 4, m$PosX)
+
+  
+  
+  #Ahora hay que concatenar las columnas que no estén en los otros CRGs y que estén en el previo.
+  u <- unique(atc[atc$CRG != 0, "Names"])
+  atc_f <- subset(m, m$CRG %in% c(0, 5190, 6124, 6144) & m$Names %in% u)
+  
+  par(mfrow=c(1,2), mar=c(3,2,3,2))
+  for (anyo in unique(m$Anyo)) {
+    t <- subset(atc_f, atc_f$Anyo==anyo)
+    t$CRG <- as.integer(as.character(t$CRG))
+    t$Prob <- as.numeric(t$Prob)
+    
+    t0 <- subset(t, t$CRG==0)
+    t5424 <- subset(t, t$CRG==5190)
+    t6144 <- subset(t, t$CRG==6124)
+    t7071 <- subset(t, t$CRG==6144)
+    plot(t0$PosX, t0$Prob*2, type ="p", ylim=c(0, max(atc_f$Prob)*2), xlim=c(0.5, 4.5), yaxt="n", xaxt="n", pch=0)
+    points(t5424$PosX, t5424$Prob*2, pch=1)
+    points(t6144$PosX, t6144$Prob*2, pch=5)
+    points(t7071$PosX, t7071$Prob*2, pch=2)
+    axis(1,  at = unique(t$PosX), labels=unique(t$CRG), cex.axis=0.6)
+    axis(2, at = etiquetas*2, 
+         labels=etiquetas, cex.axis=0.6)
+    title(main=paste("Año ", anyo, " - Evolución de ATCs por CRG-base", sep=""), cex.main=0.7)
+    if (tipo == 1 ) pintaSegmentos1(t0, t5424, t6144, t7071)
+    if (tipo == 2 ) pintaSegmentos2(t0, t5424, t6144, t7071)
+  }
+  
+  rm(t5424)
+  rm(t6144)
+  rm(t7071)
+  rm(t0)
+  rm(u)
+  rm(atc)
+  rm(atc_f)
+}
+
+pintaSegmentos1 <- function(t0, t5424, t6144, t7071) {
+  x1 <- 1.6
+  x2 <- 4.4
+  
+  for(i in 1:nrow(t0)) {
+    if (i %% 2 == 0) {
+      text(x1, t5424[i,"Prob"]*2, t5424[i, "Names"], cex=0.6)
+      segments(t0[i,"PosX"], t0[i, "Prob"]*2, t5424[i,"PosX"], t5424[i,"Prob"]*2, col="steelblue")
+      segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="steelblue")
+      segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="steelblue")
+    } else {
+      text(x2, t7071[i,"Prob"]*2, t7071[i, "Names"], cex=0.6)
+      segments(t0[i,"PosX"], t0[i, "Prob"]*2, t5424[i,"PosX"], t5424[i,"Prob"]*2, col="red")
+      segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="red")
+      segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="red")
+    }
+  }
+  
+  rm(i)
+  rm(x1)
+  rm(x2)
+}
+
+pintaSegmentos2 <- function(t0, t5424, t6144, t7071) {
+  x1 <- 1.6
+  x2 <- 4.4
+  
+  for(i in 1:8) {
+    text(x1, t5424[i,"Prob"]*2, t5424[i, "Names"], cex=0.6)
+    segments(t0[i,"PosX"], t0[i, "Prob"]*2, t5424[i,"PosX"], t5424[i,"Prob"]*2, col="steelblue")
+    segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="steelblue")
+    segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="steelblue")
+  }
+  for(i in 9:15) {
+    text(x2, t7071[i,"Prob"]*2, t7071[i, "Names"], cex=0.6)
+    segments(t0[i,"PosX"], t0[i, "Prob"]*2, t5424[i,"PosX"], t5424[i,"Prob"]*2, col="red")
+    segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="red")
+    segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="red")
+  }
+  i<-16
+  text(x1, t5424[i,"Prob"]*2, t5424[i, "Names"], cex=0.6)
+  segments(t0[i,"PosX"], t0[i, "Prob"]*2, t5424[i,"PosX"], t5424[i,"Prob"]*2, col="steelblue")
+  segments(t5424[i,"PosX"], t5424[i, "Prob"]*2, t6144[i,"PosX"], t6144[i,"Prob"]*2, col="steelblue")
+  segments(t6144[i, "PosX"], t6144[i, "Prob"]*2, t7071[i, "PosX"], t7071[i, "Prob"]*2, col="steelblue")
+  
+  rm(i)
+  rm(x1)
+  rm(x2)
+}
+
+pintaPerfilIC <- function(m, high, low, crg, anyo, fichero) {
+  label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+  pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+  par(mfrow=c(1,1), mar=c(3,2,3,2))
+  png(filename = fichero, 
+      width = 4096, height = 2048, 
+      units = "px", bg = "transparent")
+  plot(m, type = "l", cex.axis = 0.7, xaxt="n", 
+       col="black", 
+       xlab = "ATCs", ylab="Ocurrencia")
+  points(high, col="red", type="l")
+  points(low, col="red", type = "l")
+  axis(1, at=pos, labels= label, cex.axis = 0.5)
+  title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC", sep=""), 
+        cex.main=0.65)
+  dev.off()
+}
+
+pintaDiferenciaMedia <- function(h, m, crg, anyo, fichero, color, leyenda) {
+  label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+  pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+  par(mfrow=c(1,1), mar=c(3,2,3,2))
+  png(filename = fichero, 
+      width = 4096, height = 2048, 
+      units = "px", bg = "transparent")
+  plot(h, type = "l", cex.axis = 0.7, xaxt="n", 
+       col=color[1], 
+       xlab = "ATCs", ylab="Ocurrencia")
+  points(m, col=color[2], type="l")
+  axis(1, at=pos, labels= label, cex.axis = 0.5)
+  title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC", sep=""), 
+        cex.main=0.65)
+  legend("topleft", legend = leyenda, fill=color)
+  dev.off()
+}
+
+pintaATCsWilcoxon <- function(g, sexo) {
+  for (anyo in unique(g$Año)) {
+    cat(paste("\n\n<b>Año ", anyo, "</b>\n\n", sep=""))
+    gx <- subset(g, g$Año==anyo & g$pValue <= 0.0025, c(-1))
+    gx <- cbind(gx, abs(gx$MediaCrg1 - gx$MediaCrg2))
+    colnames(gx)[ncol(gx)] <- c("DifMedias")
+    df <- sqldf("SELECT CrgOrigen, CrgDestino, ATC, DifMedias from gx group by CrgDEstino, ATC, DifMedias 
+                order by CrgOrigen, CrgDestino, DifMedias desc")
+    par(mfrow=c(1,1), mar=c(3,4,2,2))
+    for (crg_origen in unique(df$CrgOrigen)) {
+      dfo <- subset(df, df$CrgOrigen == crg_origen, c("CrgDestino", "ATC", "DifMedias"))
+      for (crg_destino in unique(dfo$CrgDestino)) {
+        cat(paste("\n\n<b>Crg Origen: ", crg_origen, " - Crg Destino: ", crg_destino, "</b>\n\n", sep=""))
+        dfx <- subset(dfo, dfo$CrgDestino==crg_destino & dfo$DifMedias >= 0.03, c("ATC", "DifMedias"))
+        dfx$ATC <- factor(as.character(dfx$ATC))
+        dfx$Orden <- reorder(dfx$ATC, dfx$DifMedias, decreasing=TRUE)
+        barplot(height=dfx$DifMedias, names.arg=dfx$ATC, las=2, cex.axis=0.6, cex.names=0.5,
+                ylab="Diferencia de Medias")
+        title(cex.main= 0.7, main=paste("Año ", anyo, " - Sexo [", sexo, "]",
+                                        " [CRG Origen=", crg_origen, "] - ", " [CRG Destino=", crg_destino, "]",  
+                                        sep=""))
+      }
+    }
+  }
+  
+  rm(gx)
+  rm(df)
+  rm(dfx)
+  rm(dfo)
+  rm(anyo)
+  rm(crg_destino)
+  rm(crg_origen)
+}
+
+eliminaATCsVacios <- function(r) {
+  #Eliminamos los ATCs que están vacíos.
+  ATCs_vacios <- c()
+  
+  for (i in 1:ncol(r)) {
+    if ( min(r[, i]) == 0 & max(r[, i]) == 0) {
+      ATCs_vacios <- rbind(ATCs_vacios, colnames(r)[i])
+    }
+  } 
+  
+  rm(i)
+  
+  return(r[,!colnames(r) %in% ATCs_vacios])
 }

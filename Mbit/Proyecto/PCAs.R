@@ -25,7 +25,7 @@ eliminaATCsVacios <- function(csv, anyo, rango) {
       ATCs_vacios <- rbind(ATCs_vacios, colnames(csv)[i])
     }
   } 
-  
+  #print(AcsvTCs_vacios)
   return( csv[csv$Anyo == anyo, !colnames(csv) %in% ATCs_vacios] )
 }
 
@@ -253,7 +253,7 @@ calculaBurbujaATC <- function(datos, matriz) {
 #  }
   
   #Convertimos la matriz en una tabla para el gráfico. Se calcula la suma por CRG del total de elementos para un ATC. 
-  for (i in colnames(m_existeFamilia)) {
+  for (i in colnames(matriz)) {
     df <- sqldf(paste("select CRG_base, '", i, "' as ATC, sum(", i, ") as Total from d group by CRG_base", sep=""))
     df$Total <- floor(100*df$Total/total_crg$Total_CRG)
     m <- rbind(m, df)

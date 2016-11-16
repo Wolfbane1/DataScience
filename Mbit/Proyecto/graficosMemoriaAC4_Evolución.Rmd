@@ -1,0 +1,91 @@
+---
+title: "Graficos Análisis Correspondencias para la Evolución"
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
+
+origenData <- file.path(getwd(), "data")
+origenMat <- file.path(getwd(), "data", "mat")
+destinoCSV <- file.path(getwd(), "data", "csv")
+ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
+ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
+ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
+
+source("analisisbasico.R")
+source("ac4.R")
+
+#procesamos el CSV final.
+ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+csv <- procesaCSVDiabeticos(ficheros)
+#csv <- procesaCSVSanos(ficheros)
+
+rm(origenData)
+rm(origenMat)
+rm(destinoCSV)
+rm(ficheroDestino)
+rm(ficheroTomanA10Destino)
+rm(ficheroFiltro)
+rm(ficheros)
+
+suppressWarnings(par(new=TRUE))
+par(mfrow=c(1,1), mar=c(4,4,3,2))
+```
+
+#Revisión de Análisis de Correspondencia 
+
+ORIGEN DE INFORMACIÓN: Estamos escogiendo los pacientes que han evolucionado.
+
+
+
+Los 16 ATCs que se van a utilizar son los que se han encontrado con mayor probabilidad en cada CRG-base. Son:
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n\t\tATCS: ")
+  cat(atcImportantes)
+  cat("\n\n")
+  par(mfrow=c(1,4), mar=c(3,3,2,2))
+  Ids <- getDatosPacientesCoincidentes(csv)
+  Ids <- subset(Ids, Ids$CRG_11==5424 & Ids$CRG_12 %in% c(5424, 6144, 7071))
+  d <- csv[csv$Anyo == 2011 & csv$Id %in% Ids$Id, c(atcImportantes, "Anyo")]
+  d$CRG_12 <- csv[csv$Anyo == 2012 & csv$Id %in% Ids$Id, "CRG"]
+  cat("\n\n<b>Distribución de los ATCs importantes</b>\n\n")
+  for (i in 1:16) {
+    boxplot(d[,i] ~ d$CRG_12, main=colnames(d)[i], ylab="Disposiciones", 
+            col=c(colorCRG[1], colorCRG[9], colorCRG[20]))
+  }
+  cat("\n\n\t\tSe puede observar que:\n
+        - A02BC --> Parece que tiene información relevante en relación a la evolución a 7071.\n
+        - C10AA --> Parece que tiene información relevante en relación a la evolución a 6144, 7071.\n\n")
+
+  cat("\n\n<b>Distribución de los ATCs importantes sin 0's</b>\n\n")
+  for (i in 1:16) {
+    a <- d[d[,i] >0, c(i,17, 18)]
+    if (nrow(a) > 0 ) boxplot(a[,1] ~ a$CRG_12, col=c(colorCRG[1],colorCRG[9],colorCRG[20]), cex.main=0.8,
+                              main=paste(colnames(d)[i], "(n=", nrow(a), ")",sep=""), ylab="Disposiciones")
+  }
+  cat("\n\n\t\tSe puede observar que:\n
+        - A02BC --> Sí que parece más claro que sí tiene información relevante en relación a la evolución.\n
+        - A10BA --> Parece que tiene información relevante en la evolución sobre todo a 7071.\n
+        - B01AC --> Parece que también tiene información relevante.\n
+        - C09AA --> \n
+        - C10AA --> Así no tengo claro si es relevante o no.\n
+        - N02AX --> \n
+        - N02BB --> \n\n")
+
+  par(mfrow=c(1,1))
+  rm(d)
+  rm(i)
+  rm(a)
+  rm(Ids)
+```

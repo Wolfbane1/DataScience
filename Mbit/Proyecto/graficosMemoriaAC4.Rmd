@@ -20,21 +20,16 @@ ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
 ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
-
-colorAnyo <- c("springgreen2", "turquoise")
-colorGenero <- c("slateblue3", "snow4")
-colorCRG <- c("thistle", 
-              "darkblue", "chocolate", "green", "darkgrey", "firebrick4", "floralwhite", "firebrick", 
-              "lemonchiffon", "red",       
-              "slateblue", "saddlebrown", "aquamarine", "purple", "wheat", "orchid", "violetred", "saddlebrown", 
-              "pink", "yellow", "olivedrab", "navajowhite")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
 
 source("analisisbasico.R")
-source("ac.R")
+source("ac4.R")
 
 #procesamos el CSV final.
-ficheros <- c(ficheroDestino, ficheroFiltro)
-csv <- procesaCSV(ficheros)
+ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+csv <- procesaCSVDiabeticos(ficheros)
+#csv <- procesaCSVSanos(ficheros)
 
 rm(origenData)
 rm(origenMat)
@@ -54,34 +49,73 @@ ORIGEN DE INFORMACIÓN: Estamos escogiendo todos los datos existentes, ya que se
 
 COMPARATIVAS: Vamos a generar el análisis de correspondencia simple de dos variables. Las combinaciones que se van a generar son:
 
-  a) ATCs (14 familias principales) y CRGs (5424, 6144, 7071)
-    a.1) Se realizará reduciendo la matriz de ATCs a SUMA de DISPOSICIONES.
+  a) ATCs (16 ATCs) y CRGs (5424, 6144, 7071)
+    a.1) Se realizará usando el TOTAL de dispensaciones.
     
-    a.2) Se realizará reduciendo la matriz de ATCs a OCURRENCIA.
+    a.2) Se realizará convirtiendo a OCURRENCIA (1 cuando exita alguna dispensación).
   
-  b) ATCs (14 familias principales) y Sexo
-    b.1) Se realizará reduciendo la matriz de ATCs a SUMA de Disposiciones.
+  b) ATCs (16 ATCs) y Sexo
+    b.1) Se realizará usando el TOTAL de dispensaciones.
     
-    b.2) Se realizará reduciendo la matriz de ATCs a OCURRENCIA.
+    b.2) Se realizará convirtiendo a OCURRENCIA (1 cuando exita alguna dispensación).
   
-  c) ATCs (14 familias principales) y Edad (rango de edad en 7 grupos por percentiles)
-    c.1) Se realizará reduciendo la matriz de ATCs a SUMA de DISPOSICIONES.
+  c) ATCs (16 ATCs) y Edad (rango de edad en 7 grupos por percentiles)
+    c.1) Se realizará usando el TOTAL de dispensaciones.
     
-    c.2) Se realizará reduciendo la matriz de ATCs a OCURRENCIA.
+    c.2) Se realizará convirtiendo a OCURRENCIA (1 cuando exita alguna dispensación).
 
-Después seguiremos con los análisis de correspondencia simple para las siguientes variables: CRGs, Sexo y Rango de Edad:
-  
-  d) CRGs (5424, 6144, 7071) y Sexo
-  
-  e) CRG(5424, 6144, 7071) y Edad (rango de edad en 7 grupos por percentiles)
+Los 16 ATCs que se van a utilizar son los que se han encontrado con mayor probabilidad en cada CRG-base. Son:
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+  cat("\n\n\t\tATCS: ")
+  cat(atcImportantes)
+  cat("\n\n")
+  par(mfrow=c(1,4), mar=c(3,3,2,2))
+  d <- csv[, c(atcImportantes, "Anyo")]
+  cat("\n\n<b>Distribución de los ATCs importantes</b>\n\n")
+  for (i in 1:length(atcImportantes)) {
+    boxplot(d[,i] ~ d$Anyo, main=colnames(d)[i], ylab="Disposiciones")
+  }
+  cat("\n\n\t\tSe puede observar que en general parece que la distribución en 2012 tiene una cola un poco 
+      menor, aunque por lo que se puede observar parece que la mediana no cambia. Como hay muchos pacientes 
+      que no están tomando estos ATCs puede que afecte a la mediana, así que merece la pena revisar la 
+      distribución sin contabilizar los 0's.\n\n")
+
+  cat("\n\n<b>Distribución de los ATCs importantes sin 0's</b>\n\n")
+  for (i in 1:length(atcImportantes)) {
+    a <- d[d[,i] >0, c(i,length(atcImportantes)+1)]
+    boxplot(a[,1] ~ a$Anyo, main=colnames(d)[i], ylab="Disposiciones")
+  }
+  cat("\n\n\t\tNo se observa grandes cambios (las cajas parecen que estar un poco más arriba) en relación 
+      a la mediana. La escala es muy grande por el número de outliers posiblemente se vea algo más si 
+      aplicamos el logaritmo para 'bajar' la escala.\n\n")
+
+  cat("\n\n<b>Distribución de los ATCs importantes sin 0's y reducido a Logs</b>\n\n")
+  for (i in 1:length(atcImportantes)) {
+    a <- d[d[,i] >0, c(i,length(atcImportantes)+1)]
+    a[,1] <- log(a[,1])
+    boxplot(a[,1] ~ a$Anyo, main=paste("Log", colnames(d)[i]), ylab="Disposiciones")
+  }
+  cat("\n\n\t\tSe puede observar que efectivamente tiene menos outliers en el 2012 que en 2011 de forma 
+      general. Además, algunas cajas sí que se ven algo más chicas en 2012 que en 2011 pero, la mediana 
+      no cambia entre los años. Todo apunta a que, al menos en esto ATCs, en el 2012 a pesar de tener más 
+      pacientes la distribución de la suma de disposiciones.\n\n")
+
+  par(mfrow=c(1,1))
+  rm(d)
+  rm(i)
+  rm(a)
+```
+
+
+No replicamos en este HTML el apartado d) [CRGs (5424, 6144, 7071) y Sexo] y e) [CRG(5424, 6144, 7071) y Edad (rango de edad en 7 grupos por percentiles)] porque como no están involucrados los ATCs no presentarán cambios con respecto a lo ya analizado. 
 
 Por último, se generará el análisis de correspondencia múltiple de tres variables. Las combinaciones que se van a generar son:
 
-  f) ATCs (14 familias principales), CRGs (5424, 6144, 7071) y Rango de Edad (7 percentiles)
+  f) ATCs (16 ATCs), CRGs (5424, 6144, 7071) y Rango de Edad (7 percentiles)
   
-  g) ATCs (14 familias principales), CRGs (5424, 6144, 7071) y Sexo
+  g) ATCs (16 ATCs), CRGs (5424, 6144, 7071) y Sexo
   
-  h) CRGs (5424, 6144, 7071), Rango de Edad (7 percentiles) y Sexo.
+  h) Al igual que ocurre con los apartados d) y e), este apartado[CRGs (5424, 6144, 7071), Rango de Edad (7 percentiles) y Sexo] no se va a volver a generar
 
 NOTA: En estos casos (MAC), la reducción de los ATCs ha sido por "EXISTENCIA". Es decir, se tiene en cuenta para cada paciente si hay ocurrencia o no de los ATCs.
 
@@ -89,12 +123,12 @@ NOTA: En estos casos (MAC), la reducción de los ATCs ha sido por "EXISTENCIA". 
     
     * Selección de Ids de pacientes que en 2011 estaban en CRG-base de 5424.
     
-    * Valores categóricos por ATC (14 valores) de esos pacientes en 2011. 
+    * Valores categóricos por ATC (16 ATCs más importantes) de esos pacientes en 2011. 
     
     * Valores de CRG-base de esos pacientes para 2012. Nos quedamos con 5424, 6144 y 7071.
     
 
-##A.1) AC Simple con Reducción de SUMA de Disposiciones: ATCs - CRG: 5424, 6144, 7071.
+##A.1) AC Simple con TOTAL de Disposiciones: ATCs - CRG: 5424, 6144, 7071.
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "A.1"
@@ -167,7 +201,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##A.2) AC Simple con Reducción de Ocurrencia: ATCs - CRG: 5424, 6144, 7071.
+##A.2) AC Simple de OCURRENCIA: ATCs - CRG: 5424, 6144, 7071.
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "A.2"
@@ -240,7 +274,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##B.1) AC Simple con Reducción de SUMA de Disposiciones: ATCs (14 familias principales) y Sexo
+##B.1) AC Simple con TOTAL de Disposiciones: ATCs (16 familias) y Sexo
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "B.1"
@@ -294,7 +328,7 @@ for (anyo in unique(csv$Anyo)) {
     cat(paste("\n\n<b>Gráfico AC.(B.1).2b.", anyo, " - Test de Malinvaud</b>\n\n", sep=""))
     EscribeTestMalinvaud(p, min(ncol(m)-1, nrow(m)-1))
 
-    cat("####\n\nDistribución de la contribución de las categorías\n\n")
+    cat("\n\n####Distribución de la contribución de las categorías\n\n")
     cat(paste("\n\n<b>Gráfico AC.(B.1).3.",anyo," - Contribución a la Dimensión-ATCs-Sexo</b>\n\n", sep=""))
     EscribeContribucionDimension(m, 2)
     pintaNotaAnalisis(pintar, "E", anyo, 0, 0)
@@ -309,7 +343,7 @@ for (anyo in unique(csv$Anyo)) {
       a <- min(numb.dim.cols, numb.dim.rows)
       p$col$coord <- cbind(p$col$coord, rep(0, 2))
       xmin = range(p$row$coord[1], p$col$coord[1])[1] * 1.1
-      plot(p$row$coord, c(0,0,0,0,0,0,0,0,0,0,0,0,0,0), type = "p", pch = 16, col="blue",xlab="Dimensión 1",
+      plot(p$row$coord, rep(0,length(atcImportantes)),type = "p", pch = 16, col="blue",xlab="Dimensión 1",
            ylab="", main = paste("[",anyo,"] - ATCs[14 familias] y Sexo",sep=""), cex.main=0.7)
     points(p$col$coord, type = "p", pch = 17, col="red")
     for (i in 1:nrow(m)) {
@@ -339,7 +373,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##B.2) AC Simple con reducción de OCURRENCIA: ATCs (14 familias principales) y Sexo
+##B.2) AC Simple de OCURRENCIA: ATCs (16 familias principales) y Sexo
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "B.2"
@@ -407,9 +441,9 @@ for (anyo in unique(csv$Anyo)) {
       a <- min(numb.dim.cols, numb.dim.rows)
       p$col$coord <- cbind(p$col$coord, rep(0, 2))
       xmin = range(p$row$coord[1], p$col$coord[1])[1] * 1.1
-      plot(p$row$coord, c(0,0,0,0,0,0,0,0,0,0,0,0,0,0), type = "p", pch = 16, col="blue",
+      plot(p$row$coord, rep(0,length(atcImportantes)), type = "p", pch = 16, col="blue",
        xlab="Dimensión 1", ylab="",
-       main = paste("[", anyo, "] - ATCs[14 familias] y Sexo", sep=""), cex.main=0.7
+       main = paste("[", anyo, "] - ATCs[16 atcs] y Sexo", sep=""), cex.main=0.7
       )
     points(p$col$coord, type = "p", pch = 17, col="red")
     for (i in 1:nrow(m)) {
@@ -439,7 +473,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##C.1) AC Simple con Reducción de SUMA de Disposiciones: ATCs (14 familias principales) y Edad (rango de edad en 7 grupos por percentiles)
+##C.1) AC Simple de TOTAL de Disposiciones: ATCs (16 familias) y Edad (rango de edad en 7 grupos por percentiles)
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "C.1"
@@ -515,7 +549,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##C.2) AC Simple con Reducción de OCURRENCIA: ATCs (14 familias principales) y Edad (rango de edad en 7 grupos por percentiles)
+##C.2) AC Simple con Reducción de OCURRENCIA: ATCs (16 ATCs importantes) y Edad (rango de edad en 7 grupos por percentiles)
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "C.2"
@@ -542,7 +576,7 @@ for (anyo in unique(csv$Anyo)) {
     v <- getOrdenacion(pintar, anyo)
     cols <- 7
     rows <- 1
-    main <- "Mosaico de ATCs - Rango de Edad"
+    main <- paste("[", anyo, "] - Mosaico de ATCs - Rango de Edad", sep="")
     pintaMosaicoATCs(v, rows, cols, main)
     pintaNotaAnalisis(pintar, "B", anyo, 0, 0)
     
@@ -593,177 +627,13 @@ for (anyo in unique(csv$Anyo)) {
 
 ##D) AC Simple: CRGs (5424, 6144, 7070, 7071) y Sexo
 
-```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
-pintar <- "D"
-
-for (anyo in unique(csv$Anyo)) {
-  cat(paste("\n\n###Año ", anyo, "\n\n", sep=""))
-    #Pintamos la matriz de correspondencia.
-    m <- getCRGsSexo(csv, anyo)
-    labs <- EscribeDimensionalidadTabla(m)
-    pintaNotaAnalisis(pintar, "A", anyo, 0, 0)
-    
-  cat("\n\n###Gráfico de Mosaico\n\n") 
-  cat("TEORÍA: El gráfico mosaico representa los datos de una tabla de contingencia cuya área es 
-        proporcional a la frecuencia de cada elemento de la tabla.\n\n")
-  cat("  a) El color azul implica que la frecuencia es mayor con respecto del esperado en caso de ser 
-      datos aleatorios.\n\n")
-  cat("  b) El color rojo imlpica que la frecuencia es menor con respecto del esperado en caso de ser 
-      datos aleatorios.\n\n")
-  cat("NOTA: Más información en http://datavis.ca/online/mosaics/about.html\n\n")
-  
-    #Se pinta el mosaico con la información ordenada "visualmente"
-    cat(paste("\n\n<b>Gráfico AC.D.1.", anyo, " - Mosaico de CRGs - Sexo</b>\n\n", sep=""))
-    cols <- 2
-    rows <- 1
-    main <- paste("[", anyo, "] - Mosaico de CRGs - Sexo", sep="")
-    pintaMosaicoCRGs(v, rows, cols, main)
-    pintaNotaAnalisis(pintar, "B", anyo, 0, 0)
-    
-    rm(cols)
-    rm(rows)
-    rm(main)
-
-  cat("\n\n####Test de Independencia\n\n")
-    p <- CA(m, graph = FALSE)
-    
-    EscribeTestInercia(p)
-    pintaNotaAnalisis(pintar, "C", anyo, 0, 0)
-    
-    EscribeTestChi(m)
-    pintaNotaAnalisis(pintar, "D", anyo, 0, 0)
-
-    cat("\n\n####Varianza\n\n")
-    cat(paste("\n\n<b>Gráfico AC.D.2.", anyo, " - Explicación Varianza - CRGs-Sexo</b>\n\n", sep=""))
-    a <- fviz_screeplot(p, addlabels=TRUE, ncp=100) +
-      labs(title="% de Varianza explicada por dimensión", x = "Dimensiones", y = "")
-    print(a)
-
-    cat("####\n\nDistribución de la contribución de las categorías\n\n")
-    cat(paste("\n\n<b>Gráfico AC.D.3.", anyo, " - Contribución a la Dimensión-CRGs-Sexo</b>\n\n", sep=""))
-    EscribeContribucionDimension(m, 2)
-    pintaNotaAnalisis(pintar, "E", anyo, 0, 0)
-    
-    cat("\n\n####Salida del Análisis de Correspondencia\n\n")
-    cat(paste("\n\n<b>Gráfico AC.D.4.", anyo, " - Gráfico Simétrico - CRGs-Sexo</b>\n\n", sep=""))
-      par(mfrow=c(1,1), mar=c(4,4,2,2))
-      counter <- 1
-      numb.dim.cols<-ncol(m)-1
-      numb.dim.rows<-nrow(m)-1
-      a <- min(numb.dim.cols, numb.dim.rows)
-      p$col$coord <- cbind(p$col$coord, rep(0, 2))
-      xmin = range(p$row$coord[1], p$col$coord[1])[1] * 1.1
-      plot(p$row$coord, c(0,0,0,0), type = "p", pch = 16, col="blue",
-  #     xlim=c(-0.005, 0.005),
-  #     ylim=c(-0.4,0.4),
-       xlab="Dimensión 1", ylab="",
-       main = "ATCs[14 familias] y Sexo", cex.main=0.7
-      )
-    points(p$col$coord, type = "p", pch = 17, col="red")
-    for (i in 1:nrow(m)) {
-      text(p$row$coord[i], 0.20, rownames(m)[i], col="blue", cex=0.6)
-    }
-    for (i in 1:ncol(m)) {
-      text(p$col$coord[i], p$col$coord[i] + 0.15, colnames(m)[i], col="red", cex=0.6)
-    }
-    abline(h=0,lty=2)
-    abline(v=0,lty=2) 
-      
-    rm(counter)
-    rm(numb.dim.cols)
-    rm(numb.dim.rows)
-    rm(a)
-    rm(xmin)
-    rm(i)
-  
-    cat("\n\n")
-    pintaNotaAnalisis(pintar, "F", anyo, 0, 0)
-
-    cat(paste("\n\n<b>Gráfico AC.D.5.", anyo, " - Gráfico Asimétrico - CRGs-ATCs</b>", sep=""))
-    #EscribeGraficosAsimetricos(p, 2, "colprincipal")
-    cat("\n\n")
-    pintaNotaAnalisis(pintar, "G", anyo, 0, 0)
-    
-    rm(p)
-    rm(labs)
-    rm(m)
-}
-```
+No generamos nada. 
 
 ##E) AC Simple: CRG(5424, 6144, 7071) y Edad (rango de edad en 7 grupos por percentiles)
 
-```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
-pintar <- "E"
+No generamos nada.
 
-for (anyo in unique(csv$Anyo)) {
-  cat(paste("\n\n###Año ", anyo, "\n\n", sep=""))
-    #Pintamos la matriz de correspondencia.
-    m <- getCRGsEdad(csv, anyo)
-    labs <- EscribeDimensionalidadTabla(m)
-    pintaNotaAnalisis(pintar, "A", anyo, 0, 0)
-    
-  cat("\n\n###Gráfico de Mosaico\n\n") 
-  cat("TEORÍA: El gráfico mosaico representa los datos de una tabla de contingencia cuya área es 
-        proporcional a la frecuencia de cada elemento de la tabla.\n\n")
-  cat("  a) El color azul implica que la frecuencia es mayor con respecto del esperado en caso de ser 
-      datos aleatorios.\n\n")
-  cat("  b) El color rojo imlpica que la frecuencia es menor con respecto del esperado en caso de ser 
-      datos aleatorios.\n\n")
-  cat("NOTA: Más información en http://datavis.ca/online/mosaics/about.html\n\n")
-  
-    #Se pinta el mosaico con la información ordenada "visualmente"
-    cat(paste("\n\n<b>Gráfico AC.E.1.", anyo, " - Mosaico de CRGs - Rango de Edad</b>\n\n", sep=""))
-    cols <- 7
-    rows <- 1
-    main <- "Mosaico de CRGs - Rango de Edad"
-    pintaMosaicoCRGs(v, rows, cols, main)
-    pintaNotaAnalisis(pintar, "B", anyo, 0, 0)
-    
-    rm(cols)
-    rm(rows)
-    rm(main)
-
-  cat("\n\n####Test de Independencia\n\n")
-    p <- CA(m, graph = FALSE)
-    
-    EscribeTestInercia(p)
-    pintaNotaAnalisis(pintar, "C", anyo, 0, 0)
-    
-    EscribeTestChi(m)
-    pintaNotaAnalisis(pintar, "D", anyo, 0, 0)
-
-    cat("\n\n####Varianza\n\n")
-    cat(paste("\n\n<b>Gráfico AC.E.2.", anyo, " - Explicación Varianza - CRGs-Rango de Edad</b>",sep=""))
-    a <- fviz_screeplot(p, addlabels=TRUE, ncp=100) +
-      labs(title="% de Varianza explicada por dimensión", x = "Dimensiones", y = "")
-    print(a)
-
-    cat("\n\n####Distribución de la contribución de las categorías\n\n")
-    cat(paste("\n\n<b>Gráfico AC.E.3.", anyo, 
-              " - Contribución a la Dimensión - CRGs-Rango de Edad</b>\n\n", sep=""))
-    EscribeContribucionDimension(m, 2)
-    pintaNotaAnalisis(pintar, "E", anyo, 0, 0)
-    
-    cat("####Salida del Análisis de Correspondencia\n\n")
-    cat(paste("\n\n<b>Gráfico AC.E.4.", anyo, " - Gráfico Simétrico - CRGs-Rango de Edad</b>\n\n", sep=""))
-    EscribeGraficoSimetrico(p, paste("Gráfico Simétrico - CRGs-Rango de Edad para", anyo))
- 
-    cat("\n\n")
-    pintaNotaAnalisis(pintar, "F", anyo, 0, 0)
-
-    cat(paste("\n\n<b>Gráfico AC.E.5.", anyo, 
-              " - Gráfico Asimétrico - CRGs-Rango de Edad</b>\n\n", sep=""))
-    EscribeGraficosAsimetricos(p, 2, "colprincipal")
-    cat("\n\n")
-    pintaNotaAnalisis(pintar, "G", anyo, 0, 0)
-    
-    rm(p)
-    rm(labs)
-    rm(m)
-}
-```
-
-##F) MAC: ATCs (14 familias principales), CRGs (5424, 6144, 7071) y Rango de Edad
+##F) MAC: ATCs (16 atcs importantes), CRGs (5424, 6144, 7071) y Rango de Edad
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "F"
@@ -814,9 +684,18 @@ for (anyo in unique(csv$Anyo)) {
               ATCs - CRGs - Rango de Edad</b>\n\n",sep=""))
     #a <- fviz_mca_ind(p) +
     a <- plot(p, title=paste("[",anyo,"] - MCA filas [ATCs, CRGs, Rango de Edad]"), 
-              cex.main=0.7, habillage=15) 
+              cex.main=0.7, habillage=17) 
     print(a)
-    
+    par(mfrow=c(1,3))
+    for( crg in unique(df$CRG)) {
+      p1 <- getATCsMCA(subset(df, df$CRG==crg))
+      a <- plot(p1, title=paste("[",anyo,"] - MCA filas [ATCs, CRGs, Rango de Edad]"), 
+              cex.main=0.7, habillage=17, ylim=c(-3, 3), xlim=c(-1.0, 2.0)) 
+      print(a)
+    }
+    rm(p1)
+    par(mfrow=c(1,1))
+        
     cat("\n\n####Salida del Análisis de Correspondencia\n\n")
 
     cat("\n\nVamos a hacer un zoom sobre lo que vemos para tratar de tener más claridad sobre las 
@@ -826,7 +705,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación no existencia CRG-ATC)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0")) 
+              "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0")) 
             ) +
       labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
                        [ATCs,CRGs]"))
@@ -837,7 +718,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación existencia CRG-ATC)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1")) 
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1")) 
             ) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
                        [ATCs,CRGs]"))
@@ -857,7 +740,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación no existencia ATC-Rango de Edad)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("R1","R2", "R3", "R4", "R5", "R6", "R7",
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0"))) +
+               "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0")))+
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
                        [ATCs,Rango]"))
     print(a)
@@ -867,7 +752,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación existencia ATC-Rango de Edad)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("R1","R2", "R3", "R4", "R5", "R6", "R7",
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1"))) +
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1"))) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
                        [ATCs,Rango]"))
     print(a)
@@ -879,7 +766,7 @@ for (anyo in unique(csv$Anyo)) {
 }
 ```
 
-##G) MAC: ATCs (14 familias principales), CRGs (5424, 6144, 7071) y Sexo
+##G) MAC: ATCs (16 familias), CRGs (5424, 6144, 7071) y Sexo
 
 ```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
 pintar <- "G"
@@ -928,8 +815,19 @@ for (anyo in unique(csv$Anyo)) {
     cat(paste("\n\n<b>Gráfico MAC.G.3.", anyo, " - Simétrico (representa las filas -pacientes-) - 
               ATCs - CRGs - Sexo</b>\n\n",sep=""))
     a <- plot(p, title=paste("[",anyo,"] - MCA filas [ATCs, CRGs, Sexo]"), 
-              cex.main=0.7, habillage=16) 
+              cex.main=0.7, habillage=18) 
     print(a)
+    par(mfrow=c(1,2))
+    for( sexo in unique(df$Sexo)) {
+      p1 <- getATCsMCA(subset(df, df$Sexo==sexo))
+      a <- plot(p1, title=paste("[",anyo,"] - MCA filas [ATCs, CRGs, Rango de Edad]"), 
+              cex.main=0.7, habillage=18, ylim=c(-1, 2), xlim=c(-2, 3)) 
+      print(a)
+      rm(p1)
+    }
+    rm(sexo)
+    par(mfrow=c(1,1))
+
     
     cat("\n\n####Salida del Análisis de Correspondencia\n\n")
 
@@ -940,8 +838,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación no existencia CRG-ATC)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0")) 
-            ) +
+              "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0"))) +  
       labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
                        [ATCs,CRGs]"))
     print(a)
@@ -951,8 +850,9 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación existencia CRG-ATC)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1")) 
-            ) +
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1"))) +  
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
                        [ATCs,CRGs]"))
     print(a)
@@ -962,26 +862,30 @@ for (anyo in unique(csv$Anyo)) {
               " - A-Simétrico (relación CRG-Sexo)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-                                     "1", "2"))) +
+                                     "Sexo_1", "Sexo_2"))) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables [CRGs, Sexo]"))
     print(a)
     pintaNotaAnalisis(pintar, "H", anyo, 0, 0)
     
-    cat(paste("\n\n<b>Gráfico MAC.F.4.d", anyo, 
+    cat(paste("\n\n<b>Gráfico MAC.G.4.d", anyo, 
               " - A-Simétrico (relación no existencia ATC-Sexo)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("Sexo_1","Sexo_2", 
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0"))) +
+              "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0"))) + 
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
                        [ATCs,Sexo]"))
     print(a)
     pintaNotaAnalisis(pintar, "I", anyo, 0, 0)
     
-    cat(paste("\n\n<b>Gráfico MAC.F.4.e", anyo, 
+    cat(paste("\n\n<b>Gráfico MAC.G.4.e", anyo, 
               " - A-Simétrico (relación existencia ATC-Sexo)</b>\n\n",sep=""))
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("Sexo_1","Sexo_2", 
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1"))) +
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1"))) +
             labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
                        [ATCs,Sexo]"))
     print(a)
@@ -995,96 +899,7 @@ for (anyo in unique(csv$Anyo)) {
 
 ##H) MAC: CRGs (5424, 6144, 7071), Rango de Edad(7 percentiles) y Sexo
 
-```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
-pintar <- "H"
-
-for (anyo in unique(csv$Anyo)) {
-  cat(paste("\n\n###Año ", anyo, sep=""))
-    #Pintamos la matriz de correspondencia.
-    df <- getCRGsEdadSexo(csv, anyo)
-    
-  cat("\n\n###Gráfico de Mosaico\n\n") 
-  cat("NOTA: No he sacado el gráfico de mosaico porque no sé cómo generar la tabla de contingencia
-      para este caso. Tengo claro cómo generar la tabla cuando se trata de una variable categórica 
-      pero, los ATCs en realidad no es una variable categórica, sino que tal y como se está representando
-      (existencia de la variable SI o NO para los pacientes) son varias variables.\n\n") 
-    cat("La matriz que paso al algoritmo sería algo como sigue:\n\n")
-    cat("\t\tA B C D G ... CRG Sexo\n\n")
-    cat("\t\t1 1 0 1 0 0 ... 5424 1\n\n")
-    cat("\n\nNOTA: Recordad que el método recibe una matriz con tantas filas como pacientes.\n\n")
-  
-  cat("\n\n####Test de Independencia\n\n")
-    p <- getCRGsEdadSexoMCA(df)
-    
-    EscribeTestInercia(p)
-    pintaNotaAnalisis(pintar, "C", anyo, 0, 0)
-    
-    #EscribeTestChi(m)
-    #pintaNotaAnalisis(pintar, "D", anyo, 0, 0)
-
-    cat("\n\n####Varianza\n\n")
-    cat(paste("\n\n<b>Gráfico MAC.H.1.", anyo, " - Explicación Varianza - CRGs - Rango de Edad - 
-              Sexo</b>\n\n",sep=""))
-    a <- fviz_screeplot(p, addlabels=TRUE, ncp = 100) +
-      labs(title="% de Varianza explicada por dimensión", x = "Dimensiones", y = "")
-    print(a)
-    
-    #cat("\n\n- Resumen del MCA\n\n")
-    #summary(p, nb.dec = 3, nbelements = 10, ncp = TRUE, file ="")
-
-    cat(paste("\n\n<b>Gráfico MAC.H.2.", anyo, " - Simétrico (representa las variables) - CRGs - Rango 
-              de Edad - Sexo</b>\n\n",sep=""))
-    a <- fviz_mca_var(p) +
-            labs(title=paste("[",anyo,"] - MCA Variables [CRGs, Rango de Edad, Sexo]"))
-    print(a)
-    pintaNotaAnalisis(pintar, "E", anyo, 0, 0)
-        
-    cat(paste("\n\n<b>Gráfico MAC.H.3.", anyo, " - Simétrico (representa las filas -pacientes-) - 
-              ATCs - CRGs - Sexo</b>\n\n",sep=""))
-    a <- plot(p, title=paste("[",anyo,"] - MCA filas [CRGs, Rango de Edad, Sexo]"), 
-              cex.main=0.7, habillage=3) 
-    print(a)
-    
-    cat("\n\n####Salida del Análisis de Correspondencia\n\n")
-
-    cat("\n\nVamos a hacer un zoom sobre lo que vemos para tratar de tener más claridad sobre las 
-        variables a revisar la dependencia entre sí.\n\n")
-    
-    cat(paste("\n\n<b>Gráfico MAC.H.4.a", anyo, 
-              " - A-Simétrico (relación no existencia CRG-Rango de Edad)</b>\n\n",sep=""))
-    a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
-            select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "R1","R2","R3","R4","R5","R6","R7"))) +
-      labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de no existencia 
-                       [CRGs, Rango Edad]"))
-    print(a)
-    pintaNotaAnalisis(pintar, "F", anyo, 0, 0)
-
-    cat(paste("\n\n<b>Gráfico MAC.H.4.b", anyo, 
-              " - A-Simétrico (relación existencia CRG-Sexo)</b>\n\n",sep=""))
-    a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
-            select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "Sexo_1","Sexo_2"))) +
-            labs(title=paste("[",anyo,"] - MCA Asimétrico con variables de si existencia 
-                       [CRGs, Sexo]"))
-    print(a)
-    pintaNotaAnalisis(pintar, "G", anyo, 0, 0)
- 
-    cat(paste("\n\n<b>Gráfico MAC.G.4.c", anyo, 
-              " - A-Simétrico (relación Sexo - Rango Edad)</b>\n\n",sep=""))
-    a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
-            select.var = list(name=c("5424", "6144", "7070", "7071", 
-                                     "Sexo_1", "Sexo_2"))) +
-            labs(title=paste("[",anyo,"] - MCA Asimétrico con variables [Sexo, Rango Edad]"))
-    print(a)
-    pintaNotaAnalisis(pintar, "H", anyo, 0, 0)
-    
-    rm(p)
-    rm(a)
-    rm(df)
-
-}
-```
+No generamos nada.
 
 ##I) MAC: CRGs de 2012 (5424, 6144, 7071), ATCs del 2011
 
@@ -1148,31 +963,230 @@ pintar <- "I"
         ATC_2011)  - Dimensión 1 y 2</b>\n\n")
     a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0")))
+              "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0")))
     print(a)
 
    cat("\n\n<b>Gráfico MAC.I.4.b - A-Simétrico (relación Existencia CRG_2012 - 
         ATC_2011) - Dimensión 1 y 2</b>\n\n")
      a <- fviz_mca_biplot(p,label="var",axes=c(1,2),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal",
               select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1")))
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1")))
     print(a)
     
     cat("\n\n<b>Gráfico MAC.I.4.c - A-Simétrico (relación no Existencia CRG_2012 - 
         ATC_2011)  - Dimensión 3 y 4</b>\n\n")
-    a <- fviz_mca_biplot(p,label="var",axes=c(3,4),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
+    a <- fviz_mca_biplot(p,label="var",axes=c(1,3),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal", 
             select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_0","B_0","C_0","D_0","G_0","H_0","J_0","L_0","M_0","N_0","P_0","R_0","S_0","V_0")))
+              "A02BC_0","A03FA_0","A06AD_0","A10BA_0","A10AE_0","B01AC_0","C03CA_0","C08CA_0","C09AA_0",
+              "C10AA_0","G04CA_0","J01MA_0","M02AA_0","N02BB_0","N02BE_0","N05AL_0","R03AC_0","R03AK_0",
+              "R03BB_0","R05CB_0", "N05BA_0")))
     print(a)
 
    cat("\n\n<b>Gráfico MAC.I.4.d - A-Simétrico (relación Existencia CRG_2012 - 
         ATC_2011) - Dimensión 3 y 4</b>\n\n")
-     a <- fviz_mca_biplot(p,label="var",axes=c(3,4),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal",
+     a <- fviz_mca_biplot(p,label="var",axes=c(1,3),geom="text",arrows=c(FALSE, TRUE), mode="colprincipal",
               select.var = list(name=c("5424", "6144", "7070", "7071", 
-              "A_1","B_1","C_1","D_1","G_1","H_1","J_1","L_1","M_1","N_1","P_1","R_1","S_1","V_1")))
+              "A02BC_1","A03FA_1","A06AD_1","A10BA_1","A10AE_1","B01AC_1","C03CA_1","C08CA_1","C09AA_1",
+              "C10AA_1","G04CA_1","J01MA_1","M02AA_1","N02BB_1","N02BE_1","N05AL_1","R03AC_1","R03AK_1",
+              "R03BB_1","R05CB_1", "N05BA_1")))
     print(a)
 
     rm(p)
     rm(a)
     rm(df)
 ```
+
+
+##J) Perfil de los ATCs que están en 2011 como 5424 para ver el perfil de ATCs (normalizado según número pacientes)
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+m <- matrix(nrow=0, ncol=4)
+Ids <- getIds2011CRGs2012(csv)
+atc_2011 <- subset(csv, csv$Anyo==2011 & csv$Id %in% Ids$Id, c(1, 7:(ncol(csv) - N)))
+
+#Iteramos por año.
+for (anyo in unique(csv$Anyo)) {
+  #Generamos título Nivel 2
+  cat(paste("\n\n##Año ", anyo, "\n\n"))
+  
+  cat("###Generacíon de gráficas individuales por CRG-base\n\n")
+  
+  atc <- subset(csv, csv$Anyo == anyo & csv$Id %in% Ids$Id, c(1,6,7:(ncol(csv) - N)))
+  par(mfrow=c(2,1), mar=c(3,2,3,2))
+  i <- 1
+  for (crg in unique(atc$CRG)) {
+    cat(paste("\n\nGráfica ATC.CRG[", crg, "] - ", anyo, 
+                " - Distribución de la Proporción de la toma de ATCs",
+                ", Número de pacientes: ", length(atc[atc$CRG==crg, "CRG"]), "\n\n", sep=""))
+
+    #Filtramos por el ATC y quitamos la columna del CRG.
+    atc_crg <- subset(atc, atc$CRG == crg, c(-2))
+    atc_crg_2011 <- subset(atc_2011, atc_2011$Id %in% atc_crg$Id, c(-1))
+    atc_crg <- atc_crg[,-1]
+    
+    #Sumamos el total de las dispensaciones.
+    t <- apply(atc_crg, 2, convierteExistencia)
+    atc_col <- 100*apply(t, 2, sum)/nrow(t)
+
+    t <- apply(atc_crg_2011, 2, convierteExistencia)
+    atc_col_2011 <- 100*apply(t, 2, sum)/nrow(t)
+
+    label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+    pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+
+    #Gráfica con patrón del 2011
+    plot(atc_col_2011, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main="CRG fijo: 5424 - Ocurrencia de ATC en 2011", cex.main=0.65)
+
+    #Gráfica con patrón del año en iteración
+    plot(atc_col, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC (iteración)", sep=""), 
+            cex.main=0.65)
+
+    #Zoom fijo en 2011
+    plot(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)])), 
+           labels=names(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)]), cex.axis = 0.5, las=3)
+    title(main="ZOOM fijo 2011 para pacientes: ATCs con mayor Ocurrencia", 
+            cex.main=0.65)
+    abline(h=25, col="red")
+    abline(h=50, col="red")
+    abline(h=75, col="red")
+
+    #Zoom iterado
+    plot(atc_col[atc_col >= quantile(atc_col, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col[atc_col >= quantile(atc_col, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col[atc_col >= quantile(atc_col, 0.96)])), 
+           labels=names(atc_col[atc_col >= quantile(atc_col, 0.96)]), cex.axis = 0.5, las=3)
+    title(main=paste("Año: ", anyo, " - ZOOM: ATCs con mayor Ocurrencia (iterado)", sep=""), 
+            cex.main=0.65)
+    abline(h=25, col="red")
+    abline(h=50, col="red")
+    abline(h=75, col="red")
+    
+    i <- i+1
+  }
+}
+  
+rm(atc_crg)
+rm(atc_col)
+rm(Ids)
+rm(atc_col_2011)
+rm(atc_crg_2011)
+rm(atc_2011)
+rm(atc)
+rm(i)
+rm(anyo)
+rm(label)
+rm(pos)
+rm(t)
+```
+
+##K) Perfil de los ATCs que están en 2011 como 5424 para ver el perfil de ATCs (normalizado según CRGs)
+
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+m <- matrix(nrow=0, ncol=4)
+Ids <- getIds2011CRGs2012(csv)
+atc_2011 <- subset(csv, csv$Anyo==2011 & csv$Id %in% Ids$Id, c(1, 7:(ncol(csv) - N)))
+
+#Iteramos por año.
+for (anyo in unique(csv$Anyo)) {
+  #Generamos título Nivel 2
+  cat(paste("\n\n##Año ", anyo, "\n\n"))
+  
+  #Generamos el conjunto de datos.
+  #dx <- eliminaATCsVacios(csv, anyo, 7:(ncol(csv)-N))
+  #Generamos el gráfico para cada CRG.
+  cat("###Generacíon de gráficas individuales por CRG-base\n\n")
+  
+  atc <- subset(csv, csv$Anyo == anyo & csv$Id %in% Ids$Id, c(1,6,7:(ncol(csv) - N)))
+  i <- 1
+  par(mfrow=c(2,1), mar=c(3,2,3,2))
+  for (crg in unique(atc$CRG)) {
+    cat(paste("\n\nGráfica ATC.CRG.", i, ".", anyo, ": ", crg, 
+                " - Distribución de la Proporción de la toma de ATCs",
+                ", Número de pacientes: ", length(atc[atc$CRG==crg, "CRG"]), "\n\n", sep=""))
+
+    #Filtramos por el ATC y quitamos la columna del CRG.
+    atc_crg <- subset(atc, atc$CRG == crg, c(-2))
+    atc_crg_2011 <- subset(atc_2011, atc_2011$Id %in% atc_crg$Id, c(-1))
+    atc_crg <- atc_crg[,-1]
+    
+    #Sumamos el total de las dispensaciones.
+    atc_col <- 100*apply(atc_crg, 2, sum)/sum(atc_crg)
+    atc_col_2011 <- 100*apply(atc_crg_2011, 2, sum)/sum(atc_crg_2011)
+
+    label=c("A", "B", "C", "D", "G", "H", "J", "L", "M", "N", "P", "R", "S", "V")
+    pos=c(92,128,207,273,314,335,415,452,484,563,586,629,663,748)
+
+    #Gráfica con patrón del 2011
+    plot(atc_col_2011, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main="CRG fijo: 5424 - Ocurrencia de ATC en 2011", cex.main=0.65)
+
+    #Gráfica con patrón del año en iteración
+    plot(atc_col, type = "l", cex.axis = 0.7, xaxt="n", 
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    axis(1, at=pos, labels= label, cex.axis = 0.5)
+    title(main=paste("CRG:", crg, ", Año:", anyo, " - Ocurrencia de ATC (iteración)", sep=""), 
+            cex.main=0.65)
+
+    #Zoom fijo en 2011
+    plot(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)])), 
+           labels=names(atc_col_2011[atc_col_2011 >= quantile(atc_col_2011, 0.96)]), cex.axis = 0.5, las=3)
+    title(main="ZOOM fijo 2011 para pacientes: ATCs con mayor Ocurrencia", 
+            cex.main=0.65)
+    abline(h=3.5, col="red")
+    abline(h=7, col="red")
+
+    #Zoom iterado
+    plot(atc_col[atc_col >= quantile(atc_col, 0.96)], type = "l", cex.axis = 0.7, xaxt="n",
+          col=colorCRG[i], 
+          xlab = "ATCs", ylab="Ocurrencia")
+    points(atc_col[atc_col >= quantile(atc_col, 0.96)], pch=19)
+    axis(1, at=1:length(names(atc_col[atc_col >= quantile(atc_col, 0.96)])), 
+           labels=names(atc_col[atc_col >= quantile(atc_col, 0.96)]), cex.axis = 0.5, las=3)
+    title(main=paste("Año: ", anyo, " - ZOOM: ATCs con mayor Ocurrencia (iterado)", sep=""), 
+            cex.main=0.65)
+    abline(h=3.5, col="red")
+    abline(h=7, col="red")
+
+    i <- i + 1
+  }
+}
+  
+rm(atc_crg)
+rm(atc_col)
+rm(atc_crg_2011)
+rm(atc_col_2011)
+rm(atc_2011)
+rm(atc)
+rm(i)
+rm(anyo)
+rm(label)
+rm(pos)
+```
+

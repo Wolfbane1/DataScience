@@ -25,10 +25,15 @@ setwd("/Users/zzddfge/Desktop/Compartida/Proyecto_Master")
 origenData <- file.path(getwd(), "data")
 origenMat <- file.path(getwd(), "data", "mat")
 destinoCSV <- file.path(getwd(), "data", "csv")
-ficheroDestino <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroCabeceraATCs <- file.path(origenData, "ATCs.csv")
+ficheroDiabetico <- file.path(destinoCSV, "pacientesDiabetes.csv")
+ficheroHipertenso <- file.path(destinoCSV, "pacientesHipertensos.csv")
 ficheroTomanA10Destino <- file.path(destinoCSV, "tomanA10.mat")
 ficheroNoTomanA10Destino <- file.path(destinoCSV, "noTomanA10.mat")
 ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
+origenSanos <- file.path(origenMat, "MatrATC5el_norepe_Health11y12_v2016.mat")
+ficheroSanos <- file.path(destinoCSV, "pacientesSanos.csv")
+ejecuta <- "Hipertensos"
 
 ######################################################################
 #### EJECUCION SOLO PARA PROCESAR .MAT
@@ -38,13 +43,21 @@ ficheroFiltro <- file.path(destinoCSV, "ID_CS(NA).csv")
 
 source("procesaMat.R")
 
+if (ejecuta == "Diabeticos") {
+  salida <- ficheroDiabetico
+} else if (ejecuta == "Hipertensos") {
+  salida <- ficheroHipertenso
+}
+
 #procesamos todos los ficheros y generamos el CSV final.
-procesa(origenData, origenMat, destinoCSV)
+procesa(ficheroCabeceraATCs, origenMat, origenSanos, ficheroSanos, destinoCSV, salida, ejecuta)
 
 rm(procesa)
 rm(procesaAnyo)
 rm(procesaCabecera)
 rm(procesaFicheroMat)
+rm(salida)
+rm(ficheroCabeceraATCs)
 
 ######################################################################
 #### EJECUCION SOLO PARA HACER VISUALIZACION DESCRIPTIVA
@@ -54,8 +67,9 @@ rm(procesaFicheroMat)
 
 source("analisisbasico.R")
 
-ficheros <- c(ficheroDestino, ficheroFiltro)
-csv <- procesaCSV(ficheros)
+ficheros <- c(ficheroDestino, ficheroFiltro, ficheroSanos)
+csv <- procesaCSVDiabeticos(ficheros)
+sanos <- procesaCSVSanos(ficheros)
 
 #Sacar datos del 2011
 #estadisticos(2011,ficheroTomanA10Destino, ficheroNoTomanA10Destino)
@@ -71,6 +85,7 @@ rm(origenData)
 rm(origenMat)
 rm(ficheroTomanA10Destino)
 rm(ficheroNoTomanA10Destino)
+rm(origenSanos)
 
 #d <- csv
 
@@ -89,7 +104,8 @@ rm(estadisticosNivelCRG)
 rm(estadisticosPosATCsVacios)
 rm(estadisticosSexo)
 rm(modificaDatos)
-rm(procesaCSV)
+rm(procesaCSVDiabeticos)
+rm(procesaCSVSanos)
 rm(procesaFicheroFiltro)
 rm(obtieneRangoEdad)
 rm(ejecutaComparativa)
