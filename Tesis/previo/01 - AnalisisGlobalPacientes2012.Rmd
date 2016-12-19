@@ -1,0 +1,58 @@
+---
+title: "AnalisisPacientesCRG2012"
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+creation date: 27/11/2016
+---
+
+```{r, echo=FALSE}
+cat(paste("Execution date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Tesis")
+
+origenData <- file.path(getwd(), "Datos", "original")
+entradaData <- file.path(getwd(), "Datos", "entrada")
+software <- file.path(getwd(), "Software")
+
+fPacientesUnicos <- file.path(entradaData, "pacientes_unicos.csv")
+
+source( file.path(software, "01 - AnalisisGlobalPacientes2012.R") )
+
+#Leemos el CSV que va a ser origen del análisis.
+pacientes <- read.csv(fPacientesUnicos)
+
+#liberación de variables
+rm(origenData)
+rm(entradaData)
+rm(software)
+rm(fPacientesUnicos)
+```
+
+#1.- Visión por CRG.
+
+En este apartado vamos a analizar la información de los pacientes, teniendo en cuenta el total de los 
+CRGs que tienen. 
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+cat("\n\n##<b>Procesando todos los pacientes </b>\n\n")
+cat("\n\n###a) Total de Pacientes clasificados con un CRG\n\n")
+  cat("G.1 - Representa el número total de pacientes clasificados en cada año.")
+  pintaTotalPacientesCRG(pacientes)
+  
+cat("\n\n###b) Pacientes clasificados en 2012 y cascada de caídas en años anteriores\n\n")
+  cat("G.2 - Tomando de partida los pacientes que están clasificados en 2012, esta gráfica refleja el 
+      número de esos pacientes que están también clasificados en años anteriores\n\n.
+      Es decir, para los años 2012 al 2010, vemos lo siguiente: \n\n
+      - Total de pacientes que tenemos: 197.207\n\n
+      - Total de pacientes clasificadso en 2012: 171.260\n\n
+      - Total de pacientes clasificados en 2012 y 2011: 149.092\n\n
+      - Total de pacientes clasificados en 2012, 2011 y 2010: 122.103\n\n.
+      ")
+
+  pintaCaidaPacientesCRG(pacientes)  
+```
+
+

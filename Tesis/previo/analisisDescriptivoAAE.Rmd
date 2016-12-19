@@ -1,0 +1,79 @@
+---
+title: "Análisis Descriptivo - Ficheros AAE"
+author: "Francisco Javier Gutiérrez Expósito"
+output: html_document
+---
+
+```{r, echo=FALSE}
+cat(paste("date:", date()))
+```
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+#Directorio de trabajo lo asignamos al raiz. 
+setwd("/Users/zzddfge/Desktop/Compartida/Tesis")
+file_aae_2009 <- file.path(getwd(), "AAE 2009.unl")
+aae_2009 <- read.csv(file_aae_2009, header=TRUE, sep="|")
+
+
+
+#liberación de variables
+rm(file_aae_2009)
+
+#De momento lo hacemos manualmente, pero añadimos un valor 
+
+describe <- TRUE
+
+```
+
+#Análisis Descriptivo.
+
+```{r results='asis', echo=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+
+if (describe == TRUE) {
+  cat("A continuación se muestran las columnas del juego de datos para 2009.\n\n")
+  cat(colnames(aae_2009))
+  cat("\n\n")
+  cat("Ahora vamos a iterar sobre cada columna para mostrar la información de cada campo\n\n")
+
+  for (columna in colnames(aae_2009)) {
+    cat("\n\n")
+    cat(paste("#", columna, "\n\n", sep = ""))
+  
+    cat("###1.- Valores\n\n")
+    cat(table(aae_2009[,columna]))
+    cat("\n\n")
+  
+    cat("###2.- Summary\n\n")
+    cat(summary(aae_2009[,columna]))
+    cat("\n\n")
+  }
+}
+```
+
+<b>Resultado del análisis descriptivo</b>
+
+Campos del fichero <ul>
+  <li> CENTRO 1 único valor</li>
+  <li> HISTORIA. 86% de valores distintos. Parece que es el paciente y que cada registro corresponde a una visita.</li>
+```{r errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+aae_2009[aae_2009$HISTORIA==857456,]
+```
+
+<li> CIP. 86% de valores distintos. 46 valores desconocidos (?). Parece que hay una relación CIP - HISTORIA. </li>
+```{r errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+aae_2009[aae_2009$CIP=="ZXGN690621218010",]
+```
+
+
+</ul>
+CENTRO 
+
+Los C son Diagnósticos.
+Los P son Procedimientos
+
+
+ CIPA FECNAC SEXO REGFIN LIBRE_ELECC PROCEDENCIA SERVIC SERCCION SERVIC2 SERCCION2 MEDICO TIPVIS FECVIS DESTINO HOSPROC HOSPDEST M1 M2 C1 POAC1 CE1 POACE1 C2 POAC2 C3 POAC3 C4 POAC4 C5 POAC5 P1 LATERAL_P1 P2 LATERAL_P2 P3 P4 P5 P6 P7 P8 P9 P10 CIAS_PRO PROVINCI MUNICIPI VIA DOMI NUM NUMICU COD_CMD COD_GRD PESO GRDVER OUT_COD_EST OUT_IND_DIAG OUT_IND_PROC SEVERIDAD MORTALIDAD TIPGR PP
+
+```{r results='asis', echo=FALSE, errors=FALSE, messages=FALSE, warnings=FALSE, eval=TRUE}
+rm(describe)
+```
